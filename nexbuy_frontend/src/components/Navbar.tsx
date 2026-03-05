@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   onOpenAuth: () => void;
+  onSignOut: () => void;
+  isAuthenticated: boolean;
 };
 
-export default function Navbar({ onOpenAuth }: Props) {
+export default function Navbar({ onOpenAuth, onSignOut, isAuthenticated }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -56,11 +58,15 @@ export default function Navbar({ onOpenAuth }: Props) {
                 className="w-full text-left text-lg font-semibold text-[#313131]"
                 onClick={() => {
                   setMenuOpen(false);
+                  if (isAuthenticated) {
+                    onSignOut();
+                    return;
+                  }
                   onOpenAuth();
                 }}
                 type="button"
               >
-                Sign in / Register
+                {isAuthenticated ? "Sign out" : "Sign in / Register"}
               </button>
             </div>
           ) : null}

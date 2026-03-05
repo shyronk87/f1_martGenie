@@ -5,9 +5,10 @@ import AuthForm from "@/src/components/AuthForm";
 type Props = {
   open: boolean;
   onClose: () => void;
+  onAuthSuccess?: () => void;
 };
 
-export default function AuthModal({ open, onClose }: Props) {
+export default function AuthModal({ open, onClose, onAuthSuccess }: Props) {
   if (!open) {
     return null;
   }
@@ -29,7 +30,12 @@ export default function AuthModal({ open, onClose }: Props) {
             ×
           </button>
         </div>
-        <AuthForm onSuccess={onClose} />
+        <AuthForm
+          onSuccess={() => {
+            onAuthSuccess?.();
+            onClose();
+          }}
+        />
       </div>
     </div>
   );

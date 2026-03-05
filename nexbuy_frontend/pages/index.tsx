@@ -1,7 +1,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  clearAccessToken,
+  fetchCurrentUser,
+  readAccessToken,
+} from "@/lib/auth";
 import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
@@ -14,10 +19,40 @@ const products = [
 
 export default function HomePage() {
   const [authOpen, setAuthOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    async function syncAuthState() {
+      const token = readAccessToken();
+      if (!token) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      try {
+        await fetchCurrentUser(token);
+        setIsAuthenticated(true);
+      } catch {
+        clearAccessToken();
+        setIsAuthenticated(false);
+      }
+    }
+
+    void syncAuthState();
+  }, []);
+
+  function handleSignOut() {
+    clearAccessToken();
+    setIsAuthenticated(false);
+  }
 
   return (
     <main className="min-h-screen bg-[#f2efeb] text-[#2f2a26]">
-      <Navbar onOpenAuth={() => setAuthOpen(true)} />
+      <Navbar
+        isAuthenticated={isAuthenticated}
+        onOpenAuth={() => setAuthOpen(true)}
+        onSignOut={handleSignOut}
+      />
 
       <section id="hero" className="mx-auto grid w-full max-w-[1400px] gap-12 px-6 py-14 lg:grid-cols-2">
         <div>
@@ -88,7 +123,11 @@ export default function HomePage() {
         </button>
       </section>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
+      <AuthModal
+        onAuthSuccess={() => setIsAuthenticated(true)}
+        onClose={() => setAuthOpen(false)}
+        open={authOpen}
+      />
     </main>
   );
 }

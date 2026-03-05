@@ -4,18 +4,18 @@ import { useEffect } from "react";
 import { clearAccessToken, fetchCurrentUser, saveAccessToken } from "@/lib/auth";
 
 function readHashParams() {
-  const hash = window.location.hash.startsWith("#")
+  const rawHash = window.location.hash.startsWith("#")
     ? window.location.hash.slice(1)
     : window.location.hash;
-  return new URLSearchParams(hash);
+  return new URLSearchParams(rawHash);
 }
 
 export default function AuthCallbackPage() {
   useEffect(() => {
     async function completeOAuth() {
-      const params = readHashParams();
-      const error = params.get("error");
-      const accessToken = params.get("access_token");
+      const hashParams = readHashParams();
+      const error = hashParams.get("error");
+      const accessToken = hashParams.get("access_token");
 
       if (error) {
         clearAccessToken();
@@ -32,7 +32,7 @@ export default function AuthCallbackPage() {
       try {
         saveAccessToken(accessToken);
         await fetchCurrentUser(accessToken);
-        window.location.replace("/");
+        window.location.replace("/chat");
       } catch {
         clearAccessToken();
         window.location.replace("/?auth_error=token_validation_failed");

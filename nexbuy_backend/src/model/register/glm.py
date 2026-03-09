@@ -2,7 +2,7 @@ import asyncio
 from typing import Any
 
 from .base import ChatMessage, ChatResult
-from .config import model_settings
+from ..config import model_settings
 
 
 class GLMClient:

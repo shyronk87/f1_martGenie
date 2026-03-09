@@ -128,6 +128,6 @@ async def analyze_user_content(conversation_messages: list[ChatMessage]) -> User
         *conversation_messages,
         {"role": "user", "content": build_analysis_user_prompt()},
     ]
-    result = await llm_client.chat(messages=messages, temperature=0.1, max_tokens=2048)
+    result = await llm_client.chat(messages=messages, temperature=0.1)
     parsed = _extract_json_object(result.content)
     return _normalize(parsed)

@@ -12,8 +12,6 @@ import {
   type TimelineEvent,
 } from "@/lib/chat-api";
 
-type StepState = "done" | "active" | "pending";
-
 type FriendlyEvent = {
   title: string;
   detail: string;
@@ -63,63 +61,12 @@ function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
   };
 }
 
-function getStepStates(
-  hasUserMessage: boolean,
-  hasTimeline: boolean,
-  hasPlans: boolean,
-  isSending: boolean,
-): { understand: StepState; match: StepState; assemble: StepState; reply: StepState } {
-  if (!hasUserMessage) {
-    return {
-      understand: "pending",
-      match: "pending",
-      assemble: "pending",
-      reply: "pending",
-    };
-  }
-
-  if (hasPlans && !isSending) {
-    return {
-      understand: "done",
-      match: "done",
-      assemble: "done",
-      reply: "done",
-    };
-  }
-
-  if (hasTimeline) {
-    return {
-      understand: "done",
-      match: "active",
-      assemble: isSending ? "active" : "done",
-      reply: isSending ? "pending" : "done",
-    };
-  }
-
-  return {
-    understand: "active",
-    match: "pending",
-    assemble: "pending",
-    reply: "pending",
-  };
-}
-
-function StepDot({ state }: { state: StepState }) {
-  if (state === "done") {
-    return <span className="inline-flex h-3 w-3 rounded-full bg-emerald-400" />;
-  }
-  if (state === "active") {
-    return <span className="inline-flex h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.8)]" />;
-  }
-  return <span className="inline-flex h-3 w-3 rounded-full bg-slate-500" />;
-}
 
 export default function ChatWorkspacePage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [plans, setPlans] = useState<PlanOption[]>([]);
-  const [showOrderModal, setShowOrderModal] = useState(false);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState("Preparing workspace...");
@@ -227,7 +174,6 @@ export default function ChatWorkspacePage() {
           setPlans(eventPayload.plans);
           if (eventPayload.plans.length > 0) {
             setActivePlanId(eventPayload.plans[0].id);
-            setShowOrderModal(true);
           }
           setStatus("Plans are ready. Review and pick one.");
           return;
@@ -297,8 +243,6 @@ export default function ChatWorkspacePage() {
       ]
     : messages;
 
-  const hasUserMessage = messages.some((message) => message.role === "user");
-  const stepStates = getStepStates(hasUserMessage, timeline.length > 0, plans.length > 0, isSending);
   const timelinePreview = timeline.slice(0, 8);
   const activePlan =
     plans.find((plan) => plan.id === activePlanId) ??
@@ -393,42 +337,17 @@ export default function ChatWorkspacePage() {
           </div>
 
           <div className="mt-4 space-y-2 rounded-2xl border border-[#dfd8cb] bg-[#f8f5ef] p-3">
-            <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-              <StepDot state={stepStates.understand} />
-              <div>
-                <p className="text-sm font-medium">1) Understand your request</p>
-                <p className="text-xs text-slate-500">Extract room, budget, style, and must-haves.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-              <StepDot state={stepStates.match} />
-              <div>
-                <p className="text-sm font-medium">2) Match products</p>
-                <p className="text-xs text-slate-500">Filter catalog and remove low-fit products.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-              <StepDot state={stepStates.assemble} />
-              <div>
-                <p className="text-sm font-medium">3) Build bundles</p>
-                <p className="text-xs text-slate-500">Combine products into practical purchase options.</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-              <StepDot state={stepStates.reply} />
-              <div>
-                <p className="text-sm font-medium">4) Explain recommendation</p>
-                <p className="text-xs text-slate-500">Reply in clear language and tradeoffs.</p>
-              </div>
-            </div>
+            <p className="text-xs text-slate-600">
+              Live logs from <code>user_content_analysis</code> and <code>query_data</code> are shown below.
+            </p>
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#dfd8cb] bg-[#fbfaf7] p-3">
-            <h3 className="text-sm font-semibold text-[#6d5d49]">Live execution log (human readable)</h3>
-            <div className="mt-3 max-h-[36vh] space-y-2 overflow-y-auto pr-1">
+            <h3 className="text-sm font-semibold text-[#6d5d49]">Live execution log</h3>
+            <div className="mt-3 max-h-[40vh] space-y-2 overflow-y-auto pr-1">
               {timelinePreview.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-[#d9d2c5] px-3 py-3 text-xs text-slate-500">
-                  After you send a message, this panel will explain each step in plain language.
+                  After you send a message, real backend steps will appear here.
                 </p>
               ) : (
                 timelinePreview.map((event) => {
@@ -450,83 +369,83 @@ export default function ChatWorkspacePage() {
           </div>
 
           <div className="mt-4 rounded-2xl border border-[#dfd8cb] bg-[#f8f5ef] p-3">
-            <h3 className="text-sm font-semibold text-[#6d5d49]">Plan summary</h3>
-            <div className="mt-2 space-y-2">
+            <h3 className="text-sm font-semibold text-[#6d5d49]">Search results</h3>
+            <div className="mt-2 max-h-[32vh] space-y-3 overflow-y-auto pr-1">
               {plans.length === 0 ? (
-                <p className="text-xs text-slate-500">No plan generated yet.</p>
+                <p className="text-xs text-slate-500">No result bundle yet.</p>
               ) : (
-                plans.slice(0, 3).map((plan) => (
-                  <article className="rounded-xl border border-[#e5dfd3] bg-white p-3" key={plan.id}>
-                    <p className="text-sm font-medium text-slate-800">{plan.title}</p>
-                    <p className="mt-1 text-xs text-slate-600">{plan.summary}</p>
-                    <p className="mt-2 text-xs text-[#3f5970]">
-                      Total: ${plan.totalPrice.toLocaleString()} | Confidence:{" "}
-                      {Math.round(plan.confidence * 100)}%
-                    </p>
-                  </article>
-                ))
+                <>
+                  {plans.length > 1 ? (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {plans.map((plan) => (
+                        <button
+                          className={`rounded-full border px-3 py-1 text-xs ${
+                            (activePlan?.id ?? plans[0].id) === plan.id
+                              ? "border-[#2f6fa3] bg-[#e6f2fb] text-[#21537b]"
+                              : "border-[#d4cdbf] bg-white text-slate-600"
+                          }`}
+                          key={plan.id}
+                          onClick={() => setActivePlanId(plan.id)}
+                          type="button"
+                        >
+                          {plan.title}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  {activePlan ? (
+                    <>
+                      <article className="rounded-xl border border-[#e5dfd3] bg-white p-3">
+                        <p className="text-sm font-medium text-slate-800">{activePlan.title}</p>
+                        <p className="mt-1 text-xs text-slate-600">{activePlan.summary}</p>
+                        {activePlan.explanation ? (
+                          <p className="mt-2 rounded-lg border border-[#e5dfd3] bg-[#fcfbf8] p-2 text-xs text-slate-700">
+                            {activePlan.explanation}
+                          </p>
+                        ) : null}
+                        <p className="mt-2 text-xs text-[#3f5970]">
+                          Total: ${activePlan.totalPrice.toLocaleString()} | Confidence:{" "}
+                          {Math.round(activePlan.confidence * 100)}%
+                        </p>
+                      </article>
+                      <div className="grid gap-2">
+                        {activePlan.items.map((item) => (
+                          <article className="rounded-xl border border-[#e5dfd3] bg-white p-2" key={item.sku}>
+                            {item.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                alt={item.title}
+                                className="h-28 w-full rounded-lg border border-slate-200 object-cover"
+                                src={item.imageUrl}
+                              />
+                            ) : null}
+                            <p className="mt-2 text-xs font-semibold text-slate-800">{item.title}</p>
+                            <div className="mt-1 flex items-center justify-between">
+                              <p className="text-xs font-semibold text-slate-900">
+                                ${item.price.toLocaleString()}
+                              </p>
+                              {item.productUrl ? (
+                                <a
+                                  className="text-[11px] font-medium text-[#2f6fa3] hover:underline"
+                                  href={item.productUrl}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  View
+                                </a>
+                              ) : null}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
+                </>
               )}
             </div>
           </div>
         </aside>
       </div>
-      {showOrderModal && activePlan ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl md:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Order Preview</p>
-                <h3 className="mt-1 text-xl font-semibold text-slate-900">{activePlan.title}</h3>
-                <p className="mt-1 text-sm text-slate-600">{activePlan.summary}</p>
-                <p className="mt-2 text-sm font-medium text-slate-800">
-                  Total: ${activePlan.totalPrice.toLocaleString()}
-                </p>
-              </div>
-              <button
-                className="rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-700 hover:bg-slate-100"
-                onClick={() => setShowOrderModal(false)}
-                type="button"
-              >
-                Close
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              {activePlan.items.map((item) => (
-                <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3" key={item.sku}>
-                  {item.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      alt={item.title}
-                      className="h-44 w-full rounded-xl border border-slate-200 object-cover"
-                      src={item.imageUrl}
-                    />
-                  ) : (
-                    <div className="flex h-44 w-full items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-xs text-slate-400">
-                      No image
-                    </div>
-                  )}
-                  <h4 className="mt-3 text-sm font-semibold text-slate-900">{item.title}</h4>
-                  <p className="mt-1 text-xs text-slate-600">{item.reason}</p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-900">${item.price.toLocaleString()}</p>
-                    {item.productUrl ? (
-                      <a
-                        className="text-xs font-medium text-[#2f6fa3] hover:underline"
-                        href={item.productUrl}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        View product
-                      </a>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </main>
   );
 }

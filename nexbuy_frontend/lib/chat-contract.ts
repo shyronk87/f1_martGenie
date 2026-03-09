@@ -37,6 +37,7 @@ export type PlanOption = {
   id: string;
   title: string;
   summary: string;
+  explanation?: string;
   totalPrice: number;
   confidence: number;
   items: PlanItem[];

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
@@ -8,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src.model.bundle_composer import compose_bundle_with_ai
 from src.model.query_data import query_products_from_analysis
 from src.model.user_content_analysis import analyze_user_content_with_debug
 
@@ -25,6 +27,86 @@ def _new_id(prefix: str) -> str:
 
 def _sse(payload: dict[str, Any]) -> str:
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def _tokenize(text: str) -> list[str]:
+    parts = re.split(r"[^a-z0-9]+", text.lower())
+    return [p for p in parts if p]
+
+
+def _matches_target_category(product: Any, target_category: str) -> bool:
+    target = target_category.lower().strip()
+    searchable = " ".join(
+        [
+            str(getattr(product, "title", "") or "").lower(),
+            str(getattr(product, "category_name_1", "") or "").lower(),
+            str(getattr(product, "category_name_2", "") or "").lower(),
+            str(getattr(product, "category_name_3", "") or "").lower(),
+            str(getattr(product, "category_name_4", "") or "").lower(),
+        ]
+    )
+    if target and target in searchable:
+        return True
+
+    target_tokens = _tokenize(target)
+    if not target_tokens:
+        return False
+    return all(token in searchable for token in target_tokens if len(token) >= 3)
+
+
+def _build_bundle_items(products: list[Any], analysis: Any) -> tuple[list[dict[str, Any]], int]:
+    selected: list[dict[str, Any]] = []
+    used_skus: set[str] = set()
+    matched_target_count = 0
+
+    for target in analysis.target_items:
+        category = (target.category or "").strip()
+        if not category:
+            continue
+        need = max(1, int(target.quantity or 1))
+        matched_for_category = 0
+        for p in products:
+            sku = str(getattr(p, "sku_id_default", "") or "")
+            if not sku or sku in used_skus:
+                continue
+            if not _matches_target_category(p, category):
+                continue
+
+            selected.append(
+                {
+                    "sku": sku,
+                    "title": p.title,
+                    "price": float(p.sale_price or 0),
+                    "reason": f"Matched target item: {category}.",
+                    "imageUrl": p.main_image_url,
+                    "productUrl": p.product_url,
+                }
+            )
+            used_skus.add(sku)
+            matched_for_category += 1
+            if matched_for_category >= need:
+                break
+
+        if matched_for_category > 0:
+            matched_target_count += 1
+
+    if not selected:
+        for p in products[:3]:
+            sku = str(getattr(p, "sku_id_default", "") or "")
+            if not sku:
+                continue
+            selected.append(
+                {
+                    "sku": sku,
+                    "title": p.title,
+                    "price": float(p.sale_price or 0),
+                    "reason": "Top-ranked product from current query.",
+                    "imageUrl": p.main_image_url,
+                    "productUrl": p.product_url,
+                }
+            )
+
+    return selected, matched_target_count
 
 
 class ChatMessageIn(BaseModel):
@@ -50,8 +132,9 @@ class SessionDumpResponse(BaseModel):
 
 _SESSIONS: dict[str, dict[str, Any]] = {}
 _TASKS: dict[str, dict[str, str]] = {}
-ANALYZE_TIMEOUT_SECONDS = 45
+ANALYZE_TIMEOUT_SECONDS = 120
 QUERY_TIMEOUT_SECONDS = 20
+COMPOSE_TIMEOUT_SECONDS = 120
 
 
 @router.post("/sessions", response_model=SessionCreateResponse)
@@ -169,34 +252,79 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             yield add_timeline("candidate_found", f"Found {len(query_result.products)} matching products.")
 
             if query_result.products:
+                try:
+                    ai_bundle, bundle_logs = await asyncio.wait_for(
+                        compose_bundle_with_ai(analysis, query_result.products),
+                        timeout=COMPOSE_TIMEOUT_SECONDS,
+                    )
+                    for log in bundle_logs:
+                        yield add_timeline("bundle_built", log)
+                except asyncio.TimeoutError:
+                    yield add_timeline("bundle_built", "AI bundle composition timeout, fallback used.")
+                    ai_bundle = None
+
+                if ai_bundle is not None and ai_bundle.selections:
+                    product_map = {p.sku_id_default: p for p in query_result.products}
+                    bundle_items = []
+                    matched_target_count = 0
+                    for sel in ai_bundle.selections:
+                        p = product_map.get(sel.sku)
+                        if p is None:
+                            continue
+                        bundle_items.append(
+                            {
+                                "sku": p.sku_id_default,
+                                "title": p.title,
+                                "price": float(p.sale_price or 0),
+                                "reason": sel.reason or "Selected by AI bundle ranking.",
+                                "imageUrl": p.main_image_url,
+                                "productUrl": p.product_url,
+                            }
+                        )
+                    matched_target_count = len(bundle_items)
+                else:
+                    bundle_items, matched_target_count = _build_bundle_items(query_result.products, analysis)
+
+                target_labels = [t.category for t in analysis.target_items if t.category]
+                bundle_title = "Recommended Order Bundle"
+                bundle_summary = (
+                    f"Matched {matched_target_count}/{len(target_labels)} target categories. "
+                    "Bundle built from ranked products."
+                )
+                bundle_explanation = ""
+                if ai_bundle is not None and ai_bundle.selections:
+                    bundle_title = ai_bundle.title or bundle_title
+                    if ai_bundle.summary:
+                        bundle_summary = ai_bundle.summary
+                    bundle_explanation = ai_bundle.explanation
+                elif target_labels:
+                    bundle_title = " + ".join(target_labels[:3]) + " Bundle"
+
                 plan = {
                     "id": _new_id("plan"),
-                    "title": "Recommended Order Bundle",
-                    "summary": "Top products matched by budget, category, and constraints.",
+                    "title": bundle_title,
+                    "summary": bundle_summary,
+                    "explanation": bundle_explanation,
                     "totalPrice": round(
-                        sum(float(p.sale_price or 0) for p in query_result.products),
+                        sum(float(item["price"] or 0) for item in bundle_items),
                         2,
                     ),
                     "confidence": 0.86,
-                    "items": [
-                        {
-                            "sku": p.sku_id_default,
-                            "title": p.title,
-                            "price": float(p.sale_price or 0),
-                            "reason": "Matched your request and ranking score.",
-                            "imageUrl": p.main_image_url,
-                            "productUrl": p.product_url,
-                        }
-                        for p in query_result.products
-                    ],
+                    "items": bundle_items,
                 }
                 session["plans"] = [plan]
+                yield add_timeline(
+                    "bundle_built",
+                    f"Bundle built with {len(bundle_items)} items; matched target groups: "
+                    f"{matched_target_count}/{len(target_labels)}.",
+                )
                 yield add_timeline("plan_ready", "Prepared order-ready recommendation popup.")
                 yield _sse({"type": "plan_ready", "plans": [plan]})
-                assistant_text = (
-                    query_result.agent_reply
-                    or f"I found {len(query_result.products)} options. Please review the order popup."
-                )
+                assistant_text = query_result.agent_reply or ""
+                if bundle_explanation:
+                    assistant_text = f"{assistant_text}\n\nWhy this bundle:\n{bundle_explanation}".strip()
+                if not assistant_text:
+                    assistant_text = f"I found {len(query_result.products)} options and built a bundle for you."
             else:
                 assistant_text = (
                     "I could not find enough matches this round. "

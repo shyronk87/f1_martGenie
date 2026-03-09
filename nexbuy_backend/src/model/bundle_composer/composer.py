@@ -6,7 +6,7 @@ from src.model.query_data.schema import ProductRow
 from src.model.user_content_analysis.schema import UserContentAnalysisResult
 
 from .prompt import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
-from .schema import BundleComposeResult, BundleSelection
+from .schema import BundleComposeResult, BundleOption, BundleSelection
 
 
 MAX_CANDIDATES_FOR_COMPOSE = 24
@@ -25,20 +25,35 @@ def _extract_json(raw_text: str) -> dict[str, Any]:
 
 
 def _fallback(candidates: list[ProductRow], title: str = "Recommended Bundle") -> BundleComposeResult:
-    picks = candidates[:3]
-    return BundleComposeResult(
-        title=title,
-        summary="Fallback bundle from top-ranked candidates.",
-        explanation=(
-            "The AI bundle composer failed to return a valid structured response. "
-            "Using top-ranked products as a safe fallback."
-        ),
-        selections=[
-            BundleSelection(sku=p.sku_id_default, reason="Top-ranked candidate.")
+    if not candidates:
+        return BundleComposeResult(options=[])
+
+    option_sets: list[list[ProductRow]] = [
+        candidates[:3],
+        sorted(candidates[:10], key=lambda x: float(x.sale_price or 0))[:3],
+        sorted(candidates[:10], key=lambda x: float(x.sale_price or 0), reverse=True)[:3],
+    ]
+    options: list[BundleOption] = []
+    for i, picks in enumerate(option_sets, start=1):
+        selections = [
+            BundleSelection(sku=p.sku_id_default, reason="Top-ranked fallback candidate.")
             for p in picks
             if p.sku_id_default
-        ],
-    )
+        ]
+        if not selections:
+            continue
+        options.append(
+            BundleOption(
+                title=f"{title} #{i}",
+                summary="Fallback bundle from ranked candidates.",
+                explanation=(
+                    "AI bundle composition failed validation, so this bundle was auto-built "
+                    "from the current ranked results."
+                ),
+                selections=selections,
+            )
+        )
+    return BundleComposeResult(options=options[:5])
 
 
 def _normalize_sku(value: str) -> str:
@@ -72,7 +87,7 @@ def _build_payload(analysis: UserContentAnalysisResult, candidates: list[Product
 
 
 def _filter_valid_selections(
-    draft: BundleComposeResult,
+    draft: BundleOption,
     allowed_skus: set[str],
 ) -> list[BundleSelection]:
     filtered: list[BundleSelection] = []
@@ -84,6 +99,19 @@ def _filter_valid_selections(
         filtered.append(BundleSelection(sku=sku_norm, reason=s.reason))
         seen.add(sku_norm)
     return filtered
+
+
+def _normalize_compose_result(raw: dict[str, Any]) -> BundleComposeResult:
+    if "options" in raw and isinstance(raw.get("options"), list):
+        return BundleComposeResult(**raw)
+    # Backward compatibility for single-option format.
+    single = BundleOption(
+        title=str(raw.get("title") or "Recommended Bundle"),
+        summary=str(raw.get("summary") or ""),
+        explanation=str(raw.get("explanation") or ""),
+        selections=[BundleSelection(**s) for s in (raw.get("selections") or []) if isinstance(s, dict)],
+    )
+    return BundleComposeResult(options=[single])
 
 
 async def compose_bundle_with_ai(
@@ -113,12 +141,17 @@ async def compose_bundle_with_ai(
                 temperature=temperature,
             )
             raw = _extract_json(result.content)
-            draft = BundleComposeResult(**raw)
-            valid = _filter_valid_selections(draft, allowed_skus)
-            if not valid:
+            composed = _normalize_compose_result(raw)
+            valid_options: list[BundleOption] = []
+            for opt in composed.options[:5]:
+                valid = _filter_valid_selections(opt, allowed_skus)
+                if not valid:
+                    continue
+                opt.selections = valid[:8]
+                valid_options.append(opt)
+            if not valid_options:
                 return None, f"[bundle_composer] {tag} got no valid sku"
-            draft.selections = valid[:8]
-            return draft, None
+            return BundleComposeResult(options=valid_options), None
         except Exception as exc:
             return None, f"[bundle_composer] {tag} failed: {exc}"
 
@@ -126,7 +159,10 @@ async def compose_bundle_with_ai(
     draft, err = await _attempt(first_prompt, 0.1, "attempt#1")
     if draft is not None:
         logs.append("[bundle_composer] attempt#1 success")
-        logs.append(f"[bundle_composer] valid selections={len(draft.selections)}")
+        logs.append(
+            f"[bundle_composer] valid options={len(draft.options)}, "
+            f"total selections={sum(len(o.selections) for o in draft.options)}"
+        )
         return draft, logs
     if err:
         logs.append(err)
@@ -135,7 +171,10 @@ async def compose_bundle_with_ai(
     draft_retry, err_retry = await _attempt(retry_prompt, 0.0, "attempt#2")
     if draft_retry is not None:
         logs.append("[bundle_composer] attempt#2 success")
-        logs.append(f"[bundle_composer] valid selections={len(draft_retry.selections)}")
+        logs.append(
+            f"[bundle_composer] valid options={len(draft_retry.options)}, "
+            f"total selections={sum(len(o.selections) for o in draft_retry.options)}"
+        )
         return draft_retry, logs
     if err_retry:
         logs.append(err_retry)

@@ -403,91 +403,85 @@ export default function ChatWorkspacePage() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl border border-[#dfd8cb] bg-[#f8f5ef] p-3">
-            <h3 className="text-sm font-semibold text-[#6d5d49]">Search results</h3>
-            <div className="mt-2 max-h-[32vh] space-y-3 overflow-y-auto pr-1">
-              {plans.length === 0 ? (
-                <p className="text-xs text-slate-500">No result bundle yet.</p>
-              ) : (
-                <>
-                  {plans.length > 1 ? (
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      {plans.map((plan) => (
-                        <button
-                          className={`rounded-full border px-3 py-1 text-xs ${
-                            (activePlan?.id ?? plans[0].id) === plan.id
-                              ? "border-[#2f6fa3] bg-[#e6f2fb] text-[#21537b]"
-                              : "border-[#d4cdbf] bg-white text-slate-600"
-                          }`}
-                          key={plan.id}
-                          onClick={() => setActivePlanId(plan.id)}
-                          type="button"
-                        >
-                          {plan.title}
-                        </button>
+        </aside>
+      </div>
+      <section className="mx-auto mt-4 w-full max-w-[1500px] rounded-[28px] border border-[#dfd8cb] bg-[#f8f5ef] p-4 md:p-5">
+        <div className="flex items-center justify-between gap-4 border-b border-[#ddd5c8] pb-3">
+          <h3 className="text-base font-semibold text-[#6d5d49]">Search results</h3>
+          {orderResult ? (
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+              Order placed: {orderResult.order_id}
+            </span>
+          ) : null}
+        </div>
+        <div className="mt-3 grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+          <div className="space-y-3">
+            {plans.length === 0 ? (
+              <p className="text-sm text-slate-500">No result bundle yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {plans.map((plan) => (
+                  <section className="space-y-2" key={plan.id}>
+                    <article className="rounded-xl border border-[#e5dfd3] bg-white p-3">
+                      <p className="text-sm font-medium text-slate-800">{plan.title}</p>
+                      <p className="mt-1 text-xs text-slate-600">{plan.summary}</p>
+                      {plan.explanation ? (
+                        <p className="mt-2 rounded-lg border border-[#e5dfd3] bg-[#fcfbf8] p-2 text-xs text-slate-700">
+                          {plan.explanation}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-[#3f5970]">
+                        Total: ${plan.totalPrice.toLocaleString()} | Confidence:{" "}
+                        {Math.round(plan.confidence * 100)}%
+                      </p>
+                      <button
+                        className="mt-3 rounded-xl bg-[#2f6fa3] px-3 py-2 text-xs font-semibold text-white hover:bg-[#285f8d]"
+                        onClick={() => {
+                          setActivePlanId(plan.id);
+                          setShowOrderConfirm(true);
+                        }}
+                        type="button"
+                      >
+                        Place order
+                      </button>
+                    </article>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {plan.items.map((item) => (
+                        <article className="rounded-xl border border-[#e5dfd3] bg-white p-2" key={`${plan.id}-${item.sku}`}>
+                          {item.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              alt={item.title}
+                              className="h-28 w-full rounded-lg border border-slate-200 object-cover"
+                              src={item.imageUrl}
+                            />
+                          ) : null}
+                          <p className="mt-2 text-xs font-semibold text-slate-800">{item.title}</p>
+                          <div className="mt-1 flex items-center justify-between">
+                            <p className="text-xs font-semibold text-slate-900">
+                              ${item.price.toLocaleString()}
+                            </p>
+                            {item.productUrl ? (
+                              <a
+                                className="text-[11px] font-medium text-[#2f6fa3] hover:underline"
+                                href={item.productUrl}
+                                rel="noreferrer"
+                                target="_blank"
+                              >
+                                View
+                              </a>
+                            ) : null}
+                          </div>
+                        </article>
                       ))}
                     </div>
-                  ) : null}
-                  {activePlan ? (
-                    <>
-                      <article className="rounded-xl border border-[#e5dfd3] bg-white p-3">
-                        <p className="text-sm font-medium text-slate-800">{activePlan.title}</p>
-                        <p className="mt-1 text-xs text-slate-600">{activePlan.summary}</p>
-                        {activePlan.explanation ? (
-                          <p className="mt-2 rounded-lg border border-[#e5dfd3] bg-[#fcfbf8] p-2 text-xs text-slate-700">
-                            {activePlan.explanation}
-                          </p>
-                        ) : null}
-                        <p className="mt-2 text-xs text-[#3f5970]">
-                          Total: ${activePlan.totalPrice.toLocaleString()} | Confidence:{" "}
-                          {Math.round(activePlan.confidence * 100)}%
-                        </p>
-                        <button
-                          className="mt-3 rounded-xl bg-[#2f6fa3] px-3 py-2 text-xs font-semibold text-white hover:bg-[#285f8d]"
-                          onClick={() => setShowOrderConfirm(true)}
-                          type="button"
-                        >
-                          Place order
-                        </button>
-                      </article>
-                      <div className="grid gap-2">
-                        {activePlan.items.map((item) => (
-                          <article className="rounded-xl border border-[#e5dfd3] bg-white p-2" key={item.sku}>
-                            {item.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                alt={item.title}
-                                className="h-28 w-full rounded-lg border border-slate-200 object-cover"
-                                src={item.imageUrl}
-                              />
-                            ) : null}
-                            <p className="mt-2 text-xs font-semibold text-slate-800">{item.title}</p>
-                            <div className="mt-1 flex items-center justify-between">
-                              <p className="text-xs font-semibold text-slate-900">
-                                ${item.price.toLocaleString()}
-                              </p>
-                              {item.productUrl ? (
-                                <a
-                                  className="text-[11px] font-medium text-[#2f6fa3] hover:underline"
-                                  href={item.productUrl}
-                                  rel="noreferrer"
-                                  target="_blank"
-                                >
-                                  View
-                                </a>
-                              ) : null}
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    </>
-                  ) : null}
-                </>
-              )}
-            </div>
+                  </section>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="mt-4 rounded-2xl border border-[#dfd8cb] bg-[#f8f5ef] p-3">
-            <h3 className="text-sm font-semibold text-[#6d5d49]">Order status</h3>
+          <div className="rounded-2xl border border-[#e5dfd3] bg-white p-3">
+            <h4 className="text-sm font-semibold text-[#6d5d49]">Order status</h4>
             {orderResult ? (
               <div className="mt-2 space-y-1 text-xs text-slate-700">
                 <p>Order ID: {orderResult.order_id}</p>
@@ -502,8 +496,8 @@ export default function ChatWorkspacePage() {
               <p className="mt-2 text-xs text-slate-500">No order placed yet.</p>
             )}
           </div>
-        </aside>
-      </div>
+        </div>
+      </section>
       {showOrderConfirm && activePlan ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5">

@@ -253,7 +253,7 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             yield add_timeline("scan_progress", "Structured fields extracted.")
             try:
                 query_result = await asyncio.wait_for(
-                    query_products_from_analysis(analysis, limit=10),
+                    query_products_from_analysis(analysis, limit=50),
                     timeout=QUERY_TIMEOUT_SECONDS,
                 )
             except asyncio.TimeoutError:
@@ -293,66 +293,78 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                     yield add_timeline("bundle_built", "AI bundle composition timeout, fallback used.")
                     ai_bundle = None
 
-                if ai_bundle is not None and ai_bundle.selections:
-                    product_map = {p.sku_id_default: p for p in query_result.products}
-                    bundle_items = []
-                    matched_target_count = 0
-                    for sel in ai_bundle.selections:
-                        p = product_map.get(sel.sku)
-                        if p is None:
+                plans: list[dict[str, Any]] = []
+                target_labels = [t.category for t in analysis.target_items if t.category]
+                product_map = {p.sku_id_default: p for p in query_result.products}
+
+                if ai_bundle is not None and ai_bundle.options:
+                    for option in ai_bundle.options[:5]:
+                        bundle_items = []
+                        for sel in option.selections:
+                            p = product_map.get(sel.sku)
+                            if p is None:
+                                continue
+                            bundle_items.append(
+                                {
+                                    "sku": p.sku_id_default,
+                                    "title": p.title,
+                                    "price": float(p.sale_price or 0),
+                                    "reason": sel.reason or "Selected by AI bundle ranking.",
+                                    "imageUrl": p.main_image_url,
+                                    "productUrl": p.product_url,
+                                }
+                            )
+                        if not bundle_items:
                             continue
-                        bundle_items.append(
+                        plans.append(
                             {
-                                "sku": p.sku_id_default,
-                                "title": p.title,
-                                "price": float(p.sale_price or 0),
-                                "reason": sel.reason or "Selected by AI bundle ranking.",
-                                "imageUrl": p.main_image_url,
-                                "productUrl": p.product_url,
+                                "id": _new_id("plan"),
+                                "title": option.title or "Recommended Order Bundle",
+                                "summary": option.summary
+                                or "Bundle built from ranked products and constraints.",
+                                "explanation": option.explanation or "",
+                                "totalPrice": round(
+                                    sum(float(item["price"] or 0) for item in bundle_items),
+                                    2,
+                                ),
+                                "confidence": 0.86,
+                                "items": bundle_items,
                             }
                         )
-                    matched_target_count = len(bundle_items)
                 else:
                     bundle_items, matched_target_count = _build_bundle_items(query_result.products, analysis)
+                    bundle_title = "Recommended Order Bundle"
+                    if target_labels:
+                        bundle_title = " + ".join(target_labels[:3]) + " Bundle"
+                    plans.append(
+                        {
+                            "id": _new_id("plan"),
+                            "title": bundle_title,
+                            "summary": (
+                                f"Matched {matched_target_count}/{len(target_labels)} target categories. "
+                                "Bundle built from ranked products."
+                            ),
+                            "explanation": "",
+                            "totalPrice": round(
+                                sum(float(item["price"] or 0) for item in bundle_items),
+                                2,
+                            ),
+                            "confidence": 0.82,
+                            "items": bundle_items,
+                        }
+                    )
 
-                target_labels = [t.category for t in analysis.target_items if t.category]
-                bundle_title = "Recommended Order Bundle"
-                bundle_summary = (
-                    f"Matched {matched_target_count}/{len(target_labels)} target categories. "
-                    "Bundle built from ranked products."
-                )
-                bundle_explanation = ""
-                if ai_bundle is not None and ai_bundle.selections:
-                    bundle_title = ai_bundle.title or bundle_title
-                    if ai_bundle.summary:
-                        bundle_summary = ai_bundle.summary
-                    bundle_explanation = ai_bundle.explanation
-                elif target_labels:
-                    bundle_title = " + ".join(target_labels[:3]) + " Bundle"
-
-                plan = {
-                    "id": _new_id("plan"),
-                    "title": bundle_title,
-                    "summary": bundle_summary,
-                    "explanation": bundle_explanation,
-                    "totalPrice": round(
-                        sum(float(item["price"] or 0) for item in bundle_items),
-                        2,
-                    ),
-                    "confidence": 0.86,
-                    "items": bundle_items,
-                }
-                session["plans"] = [plan]
-                yield add_timeline(
-                    "bundle_built",
-                    f"Bundle built with {len(bundle_items)} items; matched target groups: "
-                    f"{matched_target_count}/{len(target_labels)}.",
-                )
+                plans = plans[:5]
+                session["plans"] = plans
+                yield add_timeline("bundle_built", f"Generated {len(plans)} bundle option(s).")
                 yield add_timeline("plan_ready", "Prepared order-ready recommendation popup.")
-                yield _sse({"type": "plan_ready", "plans": [plan]})
+                yield _sse({"type": "plan_ready", "plans": plans})
                 assistant_text = query_result.agent_reply or ""
-                if bundle_explanation:
-                    assistant_text = f"{assistant_text}\n\nWhy this bundle:\n{bundle_explanation}".strip()
+                first_explanation = ""
+                if plans:
+                    first_explanation = str(plans[0].get("explanation") or "").strip()
+                if first_explanation:
+                    assistant_text = f"{assistant_text}\n\nWhy this bundle:\n{first_explanation}".strip()
                 if not assistant_text:
                     assistant_text = f"I found {len(query_result.products)} options and built a bundle for you."
             else:

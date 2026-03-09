@@ -359,14 +359,11 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 yield add_timeline("bundle_built", f"Generated {len(plans)} bundle option(s).")
                 yield add_timeline("plan_ready", "Prepared order-ready recommendation popup.")
                 yield _sse({"type": "plan_ready", "plans": plans})
-                assistant_text = query_result.agent_reply or ""
-                first_explanation = ""
-                if plans:
-                    first_explanation = str(plans[0].get("explanation") or "").strip()
-                if first_explanation:
-                    assistant_text = f"{assistant_text}\n\nWhy this bundle:\n{first_explanation}".strip()
-                if not assistant_text:
-                    assistant_text = f"I found {len(query_result.products)} options and built a bundle for you."
+                assistant_text = (
+                    f"I found {len(query_result.products)} products matching your request "
+                    f"and built {len(plans)} bundle option(s). "
+                    "They are displayed in the results section below."
+                )
             else:
                 assistant_text = (
                     "I could not find enough matches this round. "

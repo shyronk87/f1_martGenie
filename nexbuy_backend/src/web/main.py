@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .auth.config import settings
 from .auth.db import engine
 from .auth.models import Base
+from .agent_negotiation_router import router as agent_negotiation_router
 from .auth.router import router as auth_router
 from .chat_router import router as chat_router
 from .memory import models as _memory_models  # noqa: F401
@@ -32,6 +33,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(memory_router, prefix="/api")
 app.include_router(negotiation_router, prefix="/api")
+app.include_router(agent_negotiation_router, prefix="/api")
 
 
 @app.get("/health", tags=["system"])

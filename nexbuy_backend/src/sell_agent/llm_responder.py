@@ -120,18 +120,17 @@ async def generate_seller_reply(
     buyer_intent: BuyerIntent,
     fallback_message: str,
 ) -> str:
-    llm = get_llm_client("glm")
-    user_prompt = (
-        "Generate seller reply for this negotiation turn.\n"
-        f"decision={decision}\n"
-        f"counter_price={counter_price}\n"
-        f"current_target_price={current_target_price}\n"
-        f"min_expected_price={min_expected_price}\n"
-        f"buyer_message={buyer_message or ''}\n"
-        f"buyer_intent={buyer_intent}\n"
-    )
-
     try:
+        llm = get_llm_client("glm")
+        user_prompt = (
+            "Generate seller reply for this negotiation turn.\n"
+            f"decision={decision}\n"
+            f"counter_price={counter_price}\n"
+            f"current_target_price={current_target_price}\n"
+            f"min_expected_price={min_expected_price}\n"
+            f"buyer_message={buyer_message or ''}\n"
+            f"buyer_intent={buyer_intent}\n"
+        )
         result = await llm.chat(
             messages=[
                 {"role": "system", "content": RESPONDER_SYSTEM_PROMPT},
@@ -143,4 +142,3 @@ async def generate_seller_reply(
         return text or fallback_message
     except Exception:
         return fallback_message
-

@@ -58,8 +58,8 @@ async def _apply_llm_price_with_guard(
     buyer_message: str | None,
     buyer_intent: Any,
 ) -> NegotiationTurn:
-    # Only let LLM decide price in active negotiation stages.
-    if turn.seller_decision not in {"counter", "reject", "accept"}:
+    # Only let LLM adjust price while negotiation is still open.
+    if turn.seller_decision not in {"counter", "reject"}:
         return turn
 
     min_expected = float(turn.min_expected_price)

@@ -72,8 +72,8 @@ async def parse_buyer_intent(message: str) -> BuyerIntent:
     if not text:
         return BuyerIntent()
 
-    llm = get_llm_client("glm")
     try:
+        llm = get_llm_client("glm")
         result = await llm.chat(
             messages=[
                 {"role": "system", "content": PARSER_SYSTEM_PROMPT},
@@ -103,4 +103,3 @@ async def parse_buyer_intent(message: str) -> BuyerIntent:
         )
     except Exception:
         return _fallback_intent_from_text(text)
-

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
@@ -19,6 +20,7 @@ import {
   saveMemoryProfile,
   type OnboardingQuestion,
 } from "@/lib/memory-api";
+import { readNegotiatedDeals, type NegotiatedDeal } from "@/lib/negotiation-store";
 
 type FriendlyEvent = {
   title: string;
@@ -71,6 +73,7 @@ function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
 
 
 export default function ChatWorkspacePage() {
+  const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
@@ -83,6 +86,7 @@ export default function ChatWorkspacePage() {
   const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestion[]>([]);
   const [onboardingAnswers, setOnboardingAnswers] = useState<Record<string, string | string[]>>({});
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
+  const [negotiatedDeals, setNegotiatedDeals] = useState<Record<string, NegotiatedDeal>>({});
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState("Preparing workspace...");
   const [error, setError] = useState("");
@@ -110,6 +114,21 @@ export default function ChatWorkspacePage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [isSending]);
+
+  useEffect(() => {
+    function syncNegotiatedDeals() {
+      setNegotiatedDeals(readNegotiatedDeals());
+    }
+
+    syncNegotiatedDeals();
+    window.addEventListener("focus", syncNegotiatedDeals);
+    window.addEventListener("storage", syncNegotiatedDeals);
+
+    return () => {
+      window.removeEventListener("focus", syncNegotiatedDeals);
+      window.removeEventListener("storage", syncNegotiatedDeals);
+    };
+  }, []);
 
   useEffect(() => {
     let unmounted = false;
@@ -307,6 +326,34 @@ export default function ChatWorkspacePage() {
     }
   }
 
+  function handleOpenNegotiation() {
+    if (!activePlan || activePlan.items.length === 0) {
+      return;
+    }
+
+    const primaryItem = activePlan.items[0];
+    const params = new URLSearchParams({
+      sku: primaryItem.sku,
+      title: primaryItem.title,
+      price: String(primaryItem.price),
+      planTitle: activePlan.title,
+    });
+
+    router.push(`/negotiation?${params.toString()}`);
+  }
+
+  function handleOpenItemNegotiation(plan: PlanOption, item: PlanOption["items"][number]) {
+    const params = new URLSearchParams({
+      sku: item.sku,
+      title: item.title,
+      price: String(item.price),
+      planId: plan.id,
+      planTitle: plan.title,
+    });
+
+    router.push(`/negotiation?${params.toString()}`);
+  }
+
   function setOnboardingMultiValue(questionKey: string, value: string, checked: boolean) {
     setOnboardingAnswers((current) => {
       const prev = current[questionKey];
@@ -377,9 +424,29 @@ export default function ChatWorkspacePage() {
     : messages;
 
   const timelinePreview = timeline.slice(0, 8);
+  const displayedPlans = plans.map((plan) => {
+    const items = plan.items.map((item) => {
+      const deal = negotiatedDeals[item.sku];
+      if (!deal) {
+        return item;
+      }
+
+      return {
+        ...item,
+        price: deal.negotiatedPrice,
+      };
+    });
+    const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
+
+    return {
+      ...plan,
+      items,
+      totalPrice,
+    };
+  });
   const activePlan =
-    plans.find((plan) => plan.id === activePlanId) ??
-    (plans.length > 0 ? plans[0] : null);
+    displayedPlans.find((plan) => plan.id === activePlanId) ??
+    (displayedPlans.length > 0 ? displayedPlans[0] : null);
 
   return (
     <main className="min-h-screen bg-[#f8f8f6] px-4 py-5 text-[#1f2937] md:px-6">
@@ -519,11 +586,11 @@ export default function ChatWorkspacePage() {
         </div>
         <div className="mt-3 grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
           <div className="space-y-3">
-            {plans.length === 0 ? (
+            {displayedPlans.length === 0 ? (
               <p className="text-sm text-slate-500">No result bundle yet.</p>
             ) : (
               <div className="space-y-4">
-                {plans.map((plan) => (
+                {displayedPlans.map((plan) => (
                   <section className="space-y-2" key={plan.id}>
                     <article className="rounded-xl border border-[#e5dfd3] bg-white p-3">
                       <p className="text-sm font-medium text-slate-800">{plan.title}</p>
@@ -560,10 +627,22 @@ export default function ChatWorkspacePage() {
                             />
                           ) : null}
                           <p className="mt-2 text-xs font-semibold text-slate-800">{item.title}</p>
-                          <div className="mt-1 flex items-center justify-between">
-                            <p className="text-xs font-semibold text-slate-900">
-                              ${item.price.toLocaleString()}
+                          {negotiatedDeals[item.sku] ? (
+                            <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+                              Bargained to ${item.price.toLocaleString()}
                             </p>
+                          ) : null}
+                          <div className="mt-1 flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-semibold text-slate-900">
+                                ${item.price.toLocaleString()}
+                              </p>
+                              {negotiatedDeals[item.sku] ? (
+                                <p className="text-[11px] text-slate-400 line-through">
+                                  ${negotiatedDeals[item.sku].originalPrice.toLocaleString()}
+                                </p>
+                              ) : null}
+                            </div>
                             {item.productUrl ? (
                               <a
                                 className="text-[11px] font-medium text-[#2f6fa3] hover:underline"
@@ -575,6 +654,13 @@ export default function ChatWorkspacePage() {
                               </a>
                             ) : null}
                           </div>
+                          <button
+                            className="mt-2 w-full rounded-lg border border-[#cdbca7] bg-[#f6ecdd] px-3 py-2 text-[11px] font-semibold text-[#6b4f2b] hover:bg-[#f2e3cc]"
+                            onClick={() => handleOpenItemNegotiation(plan, item)}
+                            type="button"
+                          >
+                            {negotiatedDeals[item.sku] ? "Bargain again" : "Try bargain"}
+                          </button>
                         </article>
                       ))}
                     </div>
@@ -584,7 +670,34 @@ export default function ChatWorkspacePage() {
             )}
           </div>
           <div className="rounded-2xl border border-[#e5dfd3] bg-white p-3">
-            <h4 className="text-sm font-semibold text-[#6d5d49]">Order status</h4>
+            <h4 className="text-sm font-semibold text-[#6d5d49]">Action panel</h4>
+            {activePlan ? (
+              <div className="mt-2 rounded-xl border border-[#ece6dc] bg-[#faf7f2] p-3">
+                <p className="text-xs uppercase tracking-[0.18em] text-[#8a745c]">Selected plan</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{activePlan.title}</p>
+                <p className="mt-1 text-xs text-slate-600">
+                  Lead item for bargaining: {activePlan.items[0]?.title ?? "N/A"}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    className="rounded-xl bg-[#2f6fa3] px-3 py-2 text-xs font-semibold text-white hover:bg-[#285f8d]"
+                    onClick={() => setShowOrderConfirm(true)}
+                    type="button"
+                  >
+                    Place order
+                  </button>
+                  <button
+                    className="rounded-xl border border-[#cdbca7] bg-[#f6ecdd] px-3 py-2 text-xs font-semibold text-[#6b4f2b] hover:bg-[#f2e3cc] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={activePlan.items.length === 0}
+                    onClick={handleOpenNegotiation}
+                    type="button"
+                  >
+                    Try bargain
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            <h5 className="mt-4 text-sm font-semibold text-[#6d5d49]">Order status</h5>
             {orderResult ? (
               <div className="mt-2 space-y-1 text-xs text-slate-700">
                 <p>Order ID: {orderResult.order_id}</p>

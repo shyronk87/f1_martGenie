@@ -13,12 +13,15 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.append(str(BACKEND_ROOT))
 
+from src.model.query_data.search_text_builder import build_search_text
+from src.model.config import model_settings
 from src.web.auth.config import settings
 
 
 ROOT_DIR = BACKEND_ROOT
 DEFAULT_INPUT = ROOT_DIR / "result" / "homary_spu.jsonl"
 DEFAULT_TABLE = "homary_products"
+EMBEDDING_DIM = int(model_settings.glm_embedding_dim or 2048)
 
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 WHITESPACE_RE = re.compile(r"\s+")
@@ -50,6 +53,8 @@ CREATE TABLE IF NOT EXISTS homary_products (
     gallery_video_count INTEGER NOT NULL DEFAULT 0,
     description_text TEXT,
     specs JSONB NOT NULL DEFAULT '{}'::jsonb,
+    search_text TEXT,
+    embedding vector(1024),
     currency_symbol TEXT,
     sale_price NUMERIC(10, 2),
     original_price NUMERIC(10, 2),
@@ -77,6 +82,14 @@ CREATE TABLE IF NOT EXISTS homary_products (
 );
 """
 
+CREATE_EXTENSION_SQL = "CREATE EXTENSION IF NOT EXISTS vector;"
+
+ALTER_VECTOR_COLUMNS_SQL = """
+ALTER TABLE homary_products
+ADD COLUMN IF NOT EXISTS search_text TEXT,
+ADD COLUMN IF NOT EXISTS embedding vector(1024);
+"""
+
 
 UPSERT_SQL = """
 INSERT INTO homary_products (
@@ -85,7 +98,7 @@ INSERT INTO homary_products (
     category_id_1, category_id_2, category_id_3, category_id_4,
     rating_value, review_count, main_image_url,
     gallery_image_urls, gallery_image_count, gallery_video_count,
-    description_text, specs,
+    description_text, specs, search_text,
     currency_symbol, sale_price, original_price, tag_price, compare_price, final_price, price_kp_cents,
     discount_text, discount_percent,
     stock_status_code, stock_status_text, sale_region_status, is_pre_sale, activity_stock,
@@ -97,7 +110,7 @@ INSERT INTO homary_products (
     :category_id_1, :category_id_2, :category_id_3, :category_id_4,
     :rating_value, :review_count, :main_image_url,
     CAST(:gallery_image_urls AS JSONB), :gallery_image_count, :gallery_video_count,
-    :description_text, CAST(:specs AS JSONB),
+    :description_text, CAST(:specs AS JSONB), :search_text,
     :currency_symbol, :sale_price, :original_price, :tag_price, :compare_price, :final_price, :price_kp_cents,
     :discount_text, :discount_percent,
     :stock_status_code, :stock_status_text, :sale_region_status, :is_pre_sale, :activity_stock,
@@ -126,6 +139,7 @@ ON CONFLICT (sku_id_default) DO UPDATE SET
     gallery_video_count = EXCLUDED.gallery_video_count,
     description_text = EXCLUDED.description_text,
     specs = EXCLUDED.specs,
+    search_text = EXCLUDED.search_text,
     currency_symbol = EXCLUDED.currency_symbol,
     sale_price = EXCLUDED.sale_price,
     original_price = EXCLUDED.original_price,
@@ -273,7 +287,8 @@ def transform_record(raw: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(act_info, dict):
         act_info = {}
 
-    return {
+    simplified_specs = simplify_specs(raw.get("details"))
+    row = {
         "spu_id": str(raw.get("spu_id") or "").strip() or None,
         "spu_code": raw.get("spu_code"),
         "title": raw.get("title") or "",
@@ -295,7 +310,7 @@ def transform_record(raw: dict[str, Any]) -> dict[str, Any]:
         "gallery_image_count": image_count,
         "gallery_video_count": video_count,
         "description_text": clean_html_text(raw.get("description")),
-        "specs": json.dumps(simplify_specs(raw.get("details")), ensure_ascii=False),
+        "specs": json.dumps(simplified_specs, ensure_ascii=False),
         "currency_symbol": extract_currency_symbol(
             price_info.get("ps"),
             price_info.get("nps"),
@@ -325,6 +340,18 @@ def transform_record(raw: dict[str, Any]) -> dict[str, Any]:
         "product_url": raw.get("url"),
         "canonical_url": raw.get("canonical"),
     }
+    row["search_text"] = build_search_text(
+        {
+            "title": row.get("title"),
+            "category_name_1": row.get("category_name_1"),
+            "category_name_2": row.get("category_name_2"),
+            "category_name_3": row.get("category_name_3"),
+            "category_name_4": row.get("category_name_4"),
+            "description_text": row.get("description_text"),
+            "specs": simplified_specs,
+        }
+    )
+    return row
 
 
 async def import_products(
@@ -338,7 +365,17 @@ async def import_products(
     if not TABLE_NAME_RE.fullmatch(table_name):
         raise ValueError(f"Invalid table name: {table_name}")
 
-    create_sql = text(CREATE_TABLE_SQL.replace("homary_products", table_name))
+    create_sql = text(
+        CREATE_TABLE_SQL.replace("homary_products", table_name).replace(
+            "vector(1024)", f"vector({EMBEDDING_DIM})"
+        )
+    )
+    create_extension_sql = text(CREATE_EXTENSION_SQL)
+    alter_vector_sql = text(
+        ALTER_VECTOR_COLUMNS_SQL.replace("homary_products", table_name).replace(
+            "vector(1024)", f"vector({EMBEDDING_DIM})"
+        )
+    )
     upsert_sql = text(UPSERT_SQL.replace("homary_products", table_name))
 
     engine = create_async_engine(settings.database_url, echo=False)
@@ -350,7 +387,9 @@ async def import_products(
         buffer: list[dict[str, Any]] = []
 
         async with engine.begin() as conn:
+            await conn.execute(create_extension_sql)
             await conn.execute(create_sql)
+            await conn.execute(alter_vector_sql)
 
             with input_path.open("r", encoding="utf-8") as f:
                 for line_no, line in enumerate(f, start=1):

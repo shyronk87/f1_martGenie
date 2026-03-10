@@ -204,20 +204,102 @@ export default function NegotiationPage() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#f8efe2_0%,#f4efe8_42%,#ece7df_100%)] px-4 py-6 text-[#231f1a] md:px-6">
-      <div className="mx-auto grid w-full max-w-6xl gap-5 lg:grid-cols-[0.92fr_1.08fr]">
+      <div className="mx-auto grid w-full max-w-7xl gap-5 xl:grid-cols-[1.5fr_0.6fr]">
+        <section className="flex min-h-[84vh] flex-col rounded-[30px] border border-[#eadfce] bg-white p-4 shadow-[0_24px_80px_rgba(58,39,15,0.08)] md:p-5 lg:p-6">
+          <div className="flex items-center justify-between border-b border-[#efe7da] pb-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-[#b58a52]">Conversation</p>
+              <h2 className="mt-1 text-2xl font-black text-[#2f241a]">Buyer vs Seller</h2>
+              <p className="mt-2 text-sm text-[#7c6957]">
+                Direct bargaining for <span className="font-semibold text-[#3f2b18]">{title}</span>
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                session?.closed
+                  ? "bg-[#e8ece3] text-[#4a6440]"
+                  : "bg-[#f8ead7] text-[#8a5e22]"
+              }`}
+            >
+              {session?.closed ? "Closed" : "Open"}
+            </span>
+          </div>
+
+          <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-[28px] border border-[#f0e7da] bg-[#fcfaf7] p-4 md:p-5">
+            {messages.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-[#deceb9] px-4 py-4 text-sm text-[#7b6b59]">
+                Preparing the seller agent...
+              </div>
+            ) : (
+              messages.map((message) => (
+                <article
+                  className={`max-w-[88%] rounded-[24px] px-4 py-3 md:px-5 md:py-4 ${
+                    message.role === "buyer"
+                      ? "ml-auto bg-[#2f6fa3] text-white"
+                      : "mr-auto border border-[#eadfce] bg-white text-[#2f241a]"
+                  }`}
+                  key={message.id}
+                >
+                  <p
+                    className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                      message.role === "buyer" ? "text-[#d9ecfb]" : "text-[#a28463]"
+                    }`}
+                  >
+                    {message.role === "buyer" ? "Buyer" : "Seller"}
+                  </p>
+                  <p className="mt-1 text-sm leading-7">{message.content}</p>
+                  {message.meta ? (
+                    <p
+                      className={`mt-2 text-[11px] ${
+                        message.role === "buyer" ? "text-[#d9ecfb]" : "text-[#7d6954]"
+                      }`}
+                    >
+                      {message.meta}
+                    </p>
+                  ) : null}
+                </article>
+              ))
+            )}
+          </div>
+
+          <form className="mt-4 border-t border-[#efe7da] pt-4" onSubmit={handleSubmit}>
+            <textarea
+              className="min-h-[110px] w-full resize-none rounded-[24px] border border-[#decfb8] bg-[#fffcf8] px-4 py-3 text-sm text-[#2f241a] outline-none focus:border-[#c9965a]"
+              disabled={!session || isSubmitting || session.closed}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="Example: I can do $850 if you can confirm today."
+              rows={3}
+              value={prompt}
+            />
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-[#8a7761]">
+                Mention a price in your message and the backend will submit it as your offer.
+              </p>
+              <button
+                className="rounded-full bg-[#8f5a2a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#7d4f25] disabled:cursor-not-allowed disabled:bg-[#ccb59f]"
+                disabled={!session || isSubmitting || session.closed || !prompt.trim()}
+                type="submit"
+              >
+                {isSubmitting ? "Sending..." : "Send offer"}
+              </button>
+            </div>
+            {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+          </form>
+        </section>
+
         <aside className="rounded-[28px] border border-[#dfd1bf] bg-[#f9f3ea] p-5 shadow-[0_20px_60px_rgba(80,54,16,0.08)]">
           <p className="text-xs font-semibold tracking-[0.24em] text-[#ad7c43] uppercase">Seller agent</p>
           <h1 className="mt-2 text-3xl font-black text-[#3f2b18]">Try bargain</h1>
           <p className="mt-3 text-sm leading-7 text-[#6c5742]">
-            You are entering a direct price negotiation with the seller agent for the lead item in
-            your recommended bundle.
+            Negotiate directly with the seller on a single product before you go back to place the
+            order.
           </p>
 
           <div className="mt-5 rounded-3xl border border-[#e6d7c4] bg-white/90 p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-[#93745a]">Current item</p>
             <h2 className="mt-1 text-xl font-bold text-[#2f241a]">{title}</h2>
             <p className="mt-2 text-sm text-[#6f6154]">From plan: {planTitle}</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 space-y-3">
               <div className="rounded-2xl bg-[#fbf7f1] p-3">
                 <p className="text-xs text-[#90745d]">List price</p>
                 <p className="mt-1 text-lg font-bold text-[#2f241a]">{priceLabel}</p>
@@ -263,85 +345,6 @@ export default function NegotiationPage() {
             </Link>
           </div>
         </aside>
-
-        <section className="flex min-h-[82vh] flex-col rounded-[30px] border border-[#eadfce] bg-white p-4 shadow-[0_24px_80px_rgba(58,39,15,0.08)] md:p-5">
-          <div className="flex items-center justify-between border-b border-[#efe7da] pb-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-[#b58a52]">Conversation</p>
-              <h2 className="mt-1 text-2xl font-black text-[#2f241a]">Buyer vs Seller</h2>
-            </div>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                session?.closed
-                  ? "bg-[#e8ece3] text-[#4a6440]"
-                  : "bg-[#f8ead7] text-[#8a5e22]"
-              }`}
-            >
-              {session?.closed ? "Closed" : "Open"}
-            </span>
-          </div>
-
-          <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-[24px] bg-[#fcfaf7] p-3">
-            {messages.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-[#deceb9] px-4 py-4 text-sm text-[#7b6b59]">
-                Preparing the seller agent...
-              </div>
-            ) : (
-              messages.map((message) => (
-                <article
-                  className={`max-w-[82%] rounded-[24px] px-4 py-3 ${
-                    message.role === "buyer"
-                      ? "ml-auto bg-[#2f6fa3] text-white"
-                      : "mr-auto border border-[#eadfce] bg-white text-[#2f241a]"
-                  }`}
-                  key={message.id}
-                >
-                  <p
-                    className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                      message.role === "buyer" ? "text-[#d9ecfb]" : "text-[#a28463]"
-                    }`}
-                  >
-                    {message.role === "buyer" ? "Buyer" : "Seller"}
-                  </p>
-                  <p className="mt-1 text-sm leading-7">{message.content}</p>
-                  {message.meta ? (
-                    <p
-                      className={`mt-2 text-[11px] ${
-                        message.role === "buyer" ? "text-[#d9ecfb]" : "text-[#7d6954]"
-                      }`}
-                    >
-                      {message.meta}
-                    </p>
-                  ) : null}
-                </article>
-              ))
-            )}
-          </div>
-
-          <form className="mt-4 border-t border-[#efe7da] pt-4" onSubmit={handleSubmit}>
-            <textarea
-              className="min-h-[90px] w-full resize-none rounded-[24px] border border-[#decfb8] bg-[#fffcf8] px-4 py-3 text-sm text-[#2f241a] outline-none focus:border-[#c9965a]"
-              disabled={!session || isSubmitting || session.closed}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Example: I can do $850 if you can confirm today."
-              rows={3}
-              value={prompt}
-            />
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-[#8a7761]">
-                Mention a price in your message and the backend will submit it as your offer.
-              </p>
-              <button
-                className="rounded-full bg-[#8f5a2a] px-5 py-3 text-sm font-semibold text-white hover:bg-[#7d4f25] disabled:cursor-not-allowed disabled:bg-[#ccb59f]"
-                disabled={!session || isSubmitting || session.closed || !prompt.trim()}
-                type="submit"
-              >
-                {isSubmitting ? "Sending..." : "Send offer"}
-              </button>
-            </div>
-            {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
-          </form>
-        </section>
       </div>
     </main>
   );

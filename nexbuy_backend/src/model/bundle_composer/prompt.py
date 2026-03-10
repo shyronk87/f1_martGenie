@@ -27,6 +27,8 @@ Output requirements:
    - in-stock products,
    - style and constraints fit.
 6) Keep selections concise (typically 2-6 items).
+7) If long_term_memory exists, you may reference it in explanation as supporting context.
+   But explicit current user requirements always have higher priority than long-term memory.
 """.strip()
 
 

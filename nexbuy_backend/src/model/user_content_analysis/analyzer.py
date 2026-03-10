@@ -129,18 +129,38 @@ async def analyze_user_content(conversation_messages: list[ChatMessage]) -> User
 
 async def analyze_user_content_with_debug(
     conversation_messages: list[ChatMessage],
+    long_term_memory: dict[str, Any] | None = None,
 ) -> tuple[UserContentAnalysisResult, list[str]]:
     logs: list[str] = []
     t0 = time.perf_counter()
     logs.append(f"[user_content_analysis] input messages={len(conversation_messages)}")
+    if long_term_memory:
+        used_keys = [k for k, v in long_term_memory.items() if v not in (None, "", [], {})]
+        logs.append(f"[user_content_analysis] long memory loaded: {used_keys}")
 
     llm_client = get_llm_client("glm")
     logs.append("[user_content_analysis] LLM client initialized")
     messages: list[ChatMessage] = [
         {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT},
+    ]
+    if long_term_memory:
+        memory_block = json.dumps(long_term_memory, ensure_ascii=False)
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "Long-term user memory (use as default preference, not as hard override):\n"
+                    f"{memory_block}\n"
+                    "Priority rule: explicit current user request overrides long-term memory."
+                ),
+            }
+        )
+    messages.extend(
+        [
         *conversation_messages,
         {"role": "user", "content": build_analysis_user_prompt()},
-    ]
+        ]
+    )
     t_llm = time.perf_counter()
     result = await llm_client.chat(messages=messages, temperature=0.1)
     logs.append(
@@ -149,6 +169,56 @@ async def analyze_user_content_with_debug(
     parsed = _extract_json_object(result.content)
     logs.append("[user_content_analysis] JSON parsed")
     normalized = _normalize(parsed)
+    if long_term_memory:
+        used_defaults: list[str] = []
+        memory_styles = [
+            str(v).strip()
+            for v in (long_term_memory.get("style_preferences") or [])
+            if str(v).strip()
+        ]
+        memory_rooms = [
+            str(v).strip()
+            for v in (long_term_memory.get("room_priorities") or [])
+            if str(v).strip()
+        ]
+        memory_constraints = [
+            str(v).strip()
+            for v in (long_term_memory.get("negative_constraints") or [])
+            if str(v).strip()
+        ]
+        household = {
+            str(v).strip().lower()
+            for v in (long_term_memory.get("household_members") or [])
+            if str(v).strip()
+        }
+        if "cat" in household:
+            memory_constraints.append("pet-friendly for cats")
+        if "dog" in household:
+            memory_constraints.append("pet-friendly for dogs")
+
+        # Current-turn explicit values always win. Long memory only fills missing fields.
+        if normalized.style_preference is None and memory_styles:
+            normalized.style_preference = memory_styles[0]
+            used_defaults.append("style_preferences->style_preference")
+        if normalized.room_type is None and memory_rooms:
+            normalized.room_type = memory_rooms[0]
+            used_defaults.append("room_priorities->room_type")
+        if not normalized.hard_constraints and memory_constraints:
+            normalized.hard_constraints = memory_constraints
+            used_defaults.append("negative_constraints/household_members->hard_constraints")
+
+        if used_defaults:
+            if (
+                normalized.total_budget is not None
+                and normalized.style_preference is not None
+                and normalized.target_items
+            ):
+                normalized.is_ready = True
+                normalized.missing_fields = []
+            logs.append(f"[user_content_analysis] applied memory defaults: {used_defaults}")
+        else:
+            logs.append("[user_content_analysis] memory loaded but no default field was applied")
+
     logs.append(
         f"[user_content_analysis] normalized: ready={normalized.is_ready}, "
         f"missing={normalized.missing_fields}, items={len(normalized.target_items)}"

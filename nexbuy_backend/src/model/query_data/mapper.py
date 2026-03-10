@@ -1,3 +1,5 @@
+from typing import Any
+
 from src.model.user_content_analysis.schema import UserContentAnalysisResult
 
 from .schema import QueryFilters
@@ -48,14 +50,38 @@ def _expand(value: str, mapping: dict[str, list[str]]) -> list[str]:
     return _clean(expanded)
 
 
-def build_query_filters(analysis: UserContentAnalysisResult, limit: int = 20) -> QueryFilters:
+def build_query_filters(
+    analysis: UserContentAnalysisResult,
+    *,
+    limit: int = 20,
+    long_term_memory: dict[str, Any] | None = None,
+) -> tuple[QueryFilters, list[str]]:
+    memory_used_fields: list[str] = []
     style_keywords: list[str] = []
     if analysis.style_preference:
         style_keywords.extend(_expand(analysis.style_preference, STYLE_SYNONYMS))
+    elif long_term_memory:
+        memory_styles = [
+            str(v).strip()
+            for v in (long_term_memory.get("style_preferences") or [])
+            if str(v).strip()
+        ]
+        if memory_styles:
+            style_keywords.extend(_expand(memory_styles[0], STYLE_SYNONYMS))
+            memory_used_fields.append("style_preferences")
 
     room_keywords: list[str] = []
     if analysis.room_type:
         room_keywords.extend(_expand(analysis.room_type, ROOM_SYNONYMS))
+    elif long_term_memory:
+        memory_rooms = [
+            str(v).strip()
+            for v in (long_term_memory.get("room_priorities") or [])
+            if str(v).strip()
+        ]
+        if memory_rooms:
+            room_keywords.extend(_expand(memory_rooms[0], ROOM_SYNONYMS))
+            memory_used_fields.append("room_priorities")
 
     item_categories: list[str] = []
     for item in analysis.target_items:
@@ -65,15 +91,37 @@ def build_query_filters(analysis: UserContentAnalysisResult, limit: int = 20) ->
     constraint_values: list[str] = list(analysis.hard_constraints)
     for item in analysis.target_items:
         constraint_values.extend(item.specific_features)
+    if not constraint_values and long_term_memory:
+        memory_constraints = [
+            str(v).strip()
+            for v in (long_term_memory.get("negative_constraints") or [])
+            if str(v).strip()
+        ]
+        household = {
+            str(v).strip().lower()
+            for v in (long_term_memory.get("household_members") or [])
+            if str(v).strip()
+        }
+        if "cat" in household:
+            memory_constraints.append("pet-friendly for cats")
+        if "dog" in household:
+            memory_constraints.append("pet-friendly for dogs")
+        if memory_constraints:
+            constraint_values.extend(memory_constraints)
+            memory_used_fields.append("negative_constraints/household_members")
+
     constraint_keywords: list[str] = []
     for c in constraint_values:
         constraint_keywords.extend(_expand(c, CONSTRAINT_SYNONYMS))
 
-    return QueryFilters(
-        max_budget=analysis.total_budget,
-        style_keywords=_clean(style_keywords),
-        room_keywords=_clean(room_keywords),
-        item_categories=_clean(item_categories),
-        constraint_keywords=_clean(constraint_keywords),
-        limit=limit,
+    return (
+        QueryFilters(
+            max_budget=analysis.total_budget,
+            style_keywords=_clean(style_keywords),
+            room_keywords=_clean(room_keywords),
+            item_categories=_clean(item_categories),
+            constraint_keywords=_clean(constraint_keywords),
+            limit=limit,
+        ),
+        memory_used_fields,
     )

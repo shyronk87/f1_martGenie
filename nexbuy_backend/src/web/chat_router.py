@@ -4,15 +4,20 @@ import re
 from datetime import datetime, timezone
 from datetime import timedelta
 from typing import Any
+from uuid import UUID
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.model.bundle_composer import compose_bundle_with_ai
+from src.model.memory import get_profile
 from src.model.query_data import query_products_from_analysis
 from src.model.user_content_analysis import analyze_user_content_with_debug
+from src.web.auth.db import async_session_maker
+from src.web.auth.dependencies import CurrentActiveUser
+from src.web.auth.models import User
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -168,17 +173,28 @@ COMPOSE_TIMEOUT_SECONDS = 120
 
 
 @router.post("/sessions", response_model=SessionCreateResponse)
-async def create_session() -> SessionCreateResponse:
+async def create_session(user: User = Depends(CurrentActiveUser)) -> SessionCreateResponse:
     session_id = _new_id("sess")
-    _SESSIONS[session_id] = {"messages": [], "timeline": [], "plans": []}
+    _SESSIONS[session_id] = {
+        "messages": [],
+        "timeline": [],
+        "plans": [],
+        "user_id": str(user.id),
+    }
     return SessionCreateResponse(session_id=session_id)
 
 
 @router.post("/sessions/{session_id}/messages", response_model=SendMessageResponse, status_code=202)
-async def send_message(session_id: str, payload: ChatMessageIn) -> SendMessageResponse:
+async def send_message(
+    session_id: str,
+    payload: ChatMessageIn,
+    user: User = Depends(CurrentActiveUser),
+) -> SendMessageResponse:
     session = _SESSIONS.get(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Chat session not found.")
+    if session.get("user_id") != str(user.id):
+        raise HTTPException(status_code=403, detail="This session does not belong to current user.")
 
     message_id = _new_id("msg")
     session["messages"].append(
@@ -195,10 +211,15 @@ async def send_message(session_id: str, payload: ChatMessageIn) -> SendMessageRe
 
 
 @router.get("/sessions/{session_id}", response_model=SessionDumpResponse)
-async def get_session(session_id: str) -> SessionDumpResponse:
+async def get_session(
+    session_id: str,
+    user: User = Depends(CurrentActiveUser),
+) -> SessionDumpResponse:
     session = _SESSIONS.get(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Chat session not found.")
+    if session.get("user_id") != str(user.id):
+        raise HTTPException(status_code=403, detail="This session does not belong to current user.")
     return SessionDumpResponse(
         session_id=session_id,
         messages=session["messages"],
@@ -236,9 +257,33 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 for m in session["messages"]
                 if m.get("role") in {"user", "assistant", "system"}
             ]
+
+            long_term_memory: dict[str, Any] | None = None
+            user_id_raw = str(session.get("user_id") or "").strip()
+            if user_id_raw:
+                try:
+                    user_id = UUID(user_id_raw)
+                    async with async_session_maker() as db_session:
+                        profile_resp = await get_profile(db_session, user_id)
+                    if profile_resp.profile is not None:
+                        profile_payload = profile_resp.profile.model_dump()
+                        long_term_memory = {
+                            k: v for k, v in profile_payload.items() if v not in (None, "", [], {})
+                        }
+                except Exception:
+                    long_term_memory = None
+            if long_term_memory:
+                loaded_keys = list(long_term_memory.keys())
+                yield add_timeline("scan_progress", f"Loaded long-term memory: {loaded_keys}")
+            else:
+                yield add_timeline("scan_progress", "No long-term memory loaded for current user.")
+
             try:
                 analysis, analysis_logs = await asyncio.wait_for(
-                    analyze_user_content_with_debug(conversation),
+                    analyze_user_content_with_debug(
+                        conversation,
+                        long_term_memory=long_term_memory,
+                    ),
                     timeout=ANALYZE_TIMEOUT_SECONDS,
                 )
             except asyncio.TimeoutError:
@@ -253,7 +298,11 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             yield add_timeline("scan_progress", "Structured fields extracted.")
             try:
                 query_result = await asyncio.wait_for(
-                    query_products_from_analysis(analysis, limit=50),
+                    query_products_from_analysis(
+                        analysis,
+                        limit=50,
+                        long_term_memory=long_term_memory,
+                    ),
                     timeout=QUERY_TIMEOUT_SECONDS,
                 )
             except asyncio.TimeoutError:
@@ -284,7 +333,11 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             if query_result.products:
                 try:
                     ai_bundle, bundle_logs = await asyncio.wait_for(
-                        compose_bundle_with_ai(analysis, query_result.products),
+                        compose_bundle_with_ai(
+                            analysis,
+                            query_result.products,
+                            long_term_memory=long_term_memory,
+                        ),
                         timeout=COMPOSE_TIMEOUT_SECONDS,
                     )
                     for log in bundle_logs:

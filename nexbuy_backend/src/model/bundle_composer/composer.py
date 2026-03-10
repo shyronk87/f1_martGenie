@@ -117,6 +117,8 @@ def _normalize_compose_result(raw: dict[str, Any]) -> BundleComposeResult:
 async def compose_bundle_with_ai(
     analysis: UserContentAnalysisResult,
     candidates: list[ProductRow],
+    *,
+    long_term_memory: dict[str, Any] | None = None,
 ) -> tuple[BundleComposeResult, list[str]]:
     logs: list[str] = []
     if not candidates:
@@ -124,10 +126,16 @@ async def compose_bundle_with_ai(
 
     ranked_candidates = _prepare_candidates(candidates)
     payload = _build_payload(analysis, ranked_candidates)
+    if long_term_memory:
+        payload["long_term_memory"] = long_term_memory
+        payload["priority_rule"] = "current_user_request_overrides_long_term_memory"
     llm = get_llm_client("glm")
     logs.append(
         f"[bundle_composer] input candidates={len(candidates)}, used for compose={len(ranked_candidates)}"
     )
+    if long_term_memory:
+        used_keys = [k for k, v in long_term_memory.items() if v not in (None, "", [], {})]
+        logs.append(f"[bundle_composer] long memory loaded: {used_keys}")
 
     allowed_skus = {_normalize_sku(c.sku_id_default) for c in ranked_candidates if c.sku_id_default}
 

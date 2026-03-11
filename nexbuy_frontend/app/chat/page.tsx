@@ -45,6 +45,20 @@ type InlineNegotiationState = {
   result: BuyerAgentRunResult | null;
 };
 
+type SavedWorkspaceState = {
+  sessionId: string | null;
+  messages: ChatMessage[];
+  timeline: TimelineEvent[];
+  plans: PlanOption[];
+  activePlanId: string | null;
+  status: string;
+  orderResult: MockOrderResponse | null;
+  inlineNegotiations: Record<string, InlineNegotiationState>;
+  expandedNegotiationSku: string | null;
+};
+
+const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
+
 function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
   const type = event.type.toLowerCase();
   const message = event.message.toLowerCase();
@@ -131,23 +145,39 @@ function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
 
 export default function ChatWorkspacePage() {
   const router = useRouter();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
-  const [plans, setPlans] = useState<PlanOption[]>([]);
-  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const initialWorkspaceRef = useRef<SavedWorkspaceState | null>(null);
+  if (initialWorkspaceRef.current === null && typeof window !== "undefined") {
+    try {
+      const raw = window.sessionStorage.getItem(WORKSPACE_STORAGE_KEY);
+      initialWorkspaceRef.current = raw ? (JSON.parse(raw) as SavedWorkspaceState) : null;
+    } catch {
+      window.sessionStorage.removeItem(WORKSPACE_STORAGE_KEY);
+      initialWorkspaceRef.current = null;
+    }
+  }
+
+  const restoredWorkspace = initialWorkspaceRef.current;
+  const [sessionId, setSessionId] = useState<string | null>(restoredWorkspace?.sessionId ?? null);
+  const [messages, setMessages] = useState<ChatMessage[]>(restoredWorkspace?.messages ?? []);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>(restoredWorkspace?.timeline ?? []);
+  const [plans, setPlans] = useState<PlanOption[]>(restoredWorkspace?.plans ?? []);
+  const [activePlanId, setActivePlanId] = useState<string | null>(restoredWorkspace?.activePlanId ?? null);
   const [showOrderConfirm, setShowOrderConfirm] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [orderResult, setOrderResult] = useState<MockOrderResponse | null>(null);
+  const [orderResult, setOrderResult] = useState<MockOrderResponse | null>(restoredWorkspace?.orderResult ?? null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestion[]>([]);
   const [onboardingAnswers, setOnboardingAnswers] = useState<Record<string, string | string[]>>({});
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
   const [negotiatedDeals, setNegotiatedDeals] = useState<Record<string, NegotiatedDeal>>({});
-  const [inlineNegotiations, setInlineNegotiations] = useState<Record<string, InlineNegotiationState>>({});
-  const [expandedNegotiationSku, setExpandedNegotiationSku] = useState<string | null>(null);
+  const [inlineNegotiations, setInlineNegotiations] = useState<Record<string, InlineNegotiationState>>(
+    restoredWorkspace?.inlineNegotiations ?? {},
+  );
+  const [expandedNegotiationSku, setExpandedNegotiationSku] = useState<string | null>(
+    restoredWorkspace?.expandedNegotiationSku ?? null,
+  );
   const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState("Preparing workspace...");
+  const [status, setStatus] = useState(restoredWorkspace?.status ?? "Preparing workspace...");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [runElapsedSec, setRunElapsedSec] = useState(0);
@@ -155,6 +185,27 @@ export default function ChatWorkspacePage() {
   const streamTextRef = useRef("");
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const runStartRef = useRef<number | null>(null);
+  const restoredWorkspaceRef = useRef(Boolean(restoredWorkspace));
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const payload: SavedWorkspaceState = {
+      sessionId,
+      messages,
+      timeline,
+      plans,
+      activePlanId,
+      status,
+      orderResult,
+      inlineNegotiations,
+      expandedNegotiationSku,
+    };
+
+    window.sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(payload));
+  }, [activePlanId, expandedNegotiationSku, inlineNegotiations, messages, orderResult, plans, sessionId, status, timeline]);
 
   useEffect(() => {
     if (!isSending) {
@@ -212,6 +263,13 @@ export default function ChatWorkspacePage() {
           setShowOnboarding(true);
           setStatus("Please complete onboarding questions first.");
         } else {
+          if (restoredWorkspaceRef.current) {
+            if (unmounted) {
+              return;
+            }
+            setStatus((current) => current || "Workspace restored.");
+            return;
+          }
           const createdSessionId = await createChatSession();
           if (unmounted) {
             return;
@@ -679,7 +737,6 @@ export default function ChatWorkspacePage() {
       ]
     : messages;
 
-  const timelinePreview = timeline.slice(0, 8);
   const displayedPlans = plans.map((plan) => {
     const items = plan.items.map((item) => {
       const deal = negotiatedDeals[item.sku];
@@ -882,7 +939,7 @@ export default function ChatWorkspacePage() {
           {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
         </section>
 
-        <aside className="min-h-[86vh] rounded-[28px] border border-[#e2ddd3] bg-[#f2eee7] p-4 md:p-5">
+        <aside className="h-[86vh] overflow-hidden rounded-[28px] border border-[#e2ddd3] bg-[#f2eee7] p-4 md:p-5">
           <div className="flex items-center justify-between border-b border-[#ddd5c8] pb-4">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-[#7b6a55]">AI Process</p>
@@ -902,14 +959,14 @@ export default function ChatWorkspacePage() {
             </span>
           </div>
 
-          <div className="mt-4 flex min-h-[70vh] flex-col rounded-2xl border border-[#dfd8cb] bg-[#fbfaf7] p-3">
+          <div className="mt-4 flex h-[calc(86vh-112px)] min-h-0 flex-col rounded-2xl border border-[#dfd8cb] bg-[#fbfaf7] p-3">
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-              {timelinePreview.length === 0 ? (
+              {timeline.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-[#d9d2c5] px-3 py-3 text-xs text-slate-500">
                   Backend pipeline events will appear here after you send a request.
                 </p>
               ) : (
-                timelinePreview.map((event) => {
+                timeline.map((event) => {
                   const friendly = buildFriendlyEvent(event);
                   return (
                     <article className="rounded-xl border border-[#e5dfd3] bg-white px-3 py-3" key={event.id}>

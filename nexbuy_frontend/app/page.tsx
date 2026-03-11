@@ -43,6 +43,36 @@ const capabilityCards = [
   },
 ];
 
+const heroProducts = [
+  {
+    category: "Lead seating",
+    title: '91" Beige Modern Chesterfield Sofa 3-Seater Button Tufted Velvet',
+    price: "$1,999.99",
+    image:
+      "https://img5.su-cdn.com/cdn-cgi/image/width=750,height=750,format=webp/mall/file/2022/06/29/f7a667c79a54d587424a51794e842bf0.jpg",
+  },
+  {
+    category: "Anchor table",
+    title: "Modern White Extendable Coffee Table with Ring-shaped Metal Pedestal",
+    price: "$649.99",
+    image:
+      "https://img5.su-cdn.com/cdn-cgi/image/width=750,height=750,format=webp/mall/2021/04/06/e6490b902737494e9bb56e7c6566f4be.jpg",
+  },
+  {
+    category: "Media console",
+    title: "Crator Wood Modern Extendable TV Stand Black and Gray Media Console with 3-Drawer",
+    price: "$599.99",
+    image:
+      "https://img5.su-cdn.com/cdn-cgi/image/width=750,height=750,format=webp/mall/file/2022/01/12/1c6ce4a8e77145bf937849583358663a.jpg",
+  },
+];
+
+const heroProductLayout = [
+  { wrapper: "left-12 top-10 w-[64%]", image: "aspect-[0.92/1]", rotation: "-8deg", baseZIndex: 10 },
+  { wrapper: "right-8 top-24 w-[42%]", image: "aspect-[0.95/1]", rotation: "6deg", baseZIndex: 30 },
+  { wrapper: "bottom-8 right-16 w-[52%]", image: "aspect-[1.08/1]", rotation: "-3deg", baseZIndex: 20 },
+];
+
 const executionFeed = [
   "[01] Requirement parsed: living room / two cats / budget-sensitive",
   "[02] Memory profile loaded: pet-safe materials prioritized",
@@ -55,6 +85,7 @@ export default function HomePage() {
   const [authOpen, setAuthOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Checking account session...");
+  const [activeHeroProduct, setActiveHeroProduct] = useState<number | null>(null);
 
   useEffect(() => {
     async function syncAuthState() {
@@ -97,11 +128,9 @@ export default function HomePage() {
           onSignOut={handleSignOut}
         />
 
-        <section
-          className="mx-auto grid w-full max-w-[1480px] gap-10 px-6 pb-12 pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:items-center"
-          id="hero"
-        >
-          <div className="max-w-3xl">
+        <section className="mx-auto w-full max-w-[1480px] px-6 pb-12 pt-28" id="hero">
+          <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
+            <div className="max-w-4xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white/70 backdrop-blur-xl">
               AI-native procurement stack
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.75)]" />
@@ -117,20 +146,6 @@ export default function HomePage() {
               controlled workflow. It behaves less like a storefront and more like an execution
               engine for high-value purchase decisions.
             </p>
-            <div className="mt-8 flex max-w-3xl flex-col gap-3 rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_24px_120px_rgba(79,70,229,0.18)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">
-                Launch prompt
-              </p>
-              <div className="flex items-center justify-between gap-4 rounded-[24px] border border-white/10 bg-black/40 px-5 py-4">
-                <p className="text-sm leading-7 text-white/72 md:text-base">
-                  Build a warm, pet-safe living room under $3,000. Rank the best bundles, expose
-                  the logic, then negotiate the lead item automatically.
-                </p>
-                <div className="hidden h-11 min-w-11 items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/15 text-indigo-200 shadow-[0_0_40px_rgba(99,102,241,0.35)] md:flex">
-                  AI
-                </div>
-              </div>
-            </div>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link
                 className="inline-flex h-12 items-center rounded-2xl bg-white px-6 text-sm font-bold text-black transition hover:bg-white/90"
@@ -147,6 +162,20 @@ export default function HomePage() {
               </button>
             </div>
             <p className="mt-4 text-sm text-white/42">{statusMessage}</p>
+            <div className="mt-8 flex max-w-3xl flex-col gap-3 rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_24px_120px_rgba(79,70,229,0.18)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">
+                Launch prompt
+              </p>
+              <div className="flex items-start justify-between gap-4 rounded-[24px] border border-white/10 bg-black/40 px-5 py-4">
+                <p className="text-sm leading-7 text-white/72 md:text-base">
+                  Build a warm, pet-safe living room under $3,000. Rank the best bundles, expose
+                  the logic, then negotiate the lead item automatically.
+                </p>
+                <div className="hidden h-11 min-w-11 items-center justify-center rounded-full border border-indigo-400/40 bg-indigo-500/15 text-indigo-200 shadow-[0_0_40px_rgba(99,102,241,0.35)] md:flex">
+                  AI
+                </div>
+              </div>
+            </div>
             <div className="mt-10 grid gap-3 md:grid-cols-3">
               {systemHighlights.map((item, index) => (
                 <article
@@ -161,59 +190,41 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:pl-6">
-            <article className="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.04] p-3 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_30px_120px_rgba(0,0,0,0.55)]">
-              <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(129,140,248,0.8),transparent)]" />
-              <div className="mb-3 flex items-center justify-between px-3 pt-2">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.22em] text-white/35">Live control surface</p>
-                  <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-white">
-                    Buyer agent workspace
-                  </p>
-                </div>
-                <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold text-emerald-300">
-                  ACTIVE
-                </span>
-              </div>
-              <div className="overflow-hidden rounded-[26px] border border-white/10 bg-black/40">
-                <Image
-                  alt="Nexbuy chat workspace"
-                  className="h-auto w-full object-cover"
-                  height={900}
-                  priority
-                  src="/main_page/chat.png"
-                  width={1200}
-                />
-              </div>
-            </article>
-            <div className="grid gap-4 md:grid-cols-2">
-              <article className="relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-3 backdrop-blur-xl transition hover:border-sky-400/30 hover:shadow-[0_0_70px_rgba(56,189,248,0.14)]">
-                <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(56,189,248,0.8),transparent)]" />
-                <p className="px-2 pt-2 text-xs uppercase tracking-[0.22em] text-white/35">Recommendation graph</p>
-                <div className="mt-3 overflow-hidden rounded-[22px] border border-white/10 bg-black/30">
-                  <Image
-                    alt="Product recommendation surface"
-                    className="h-auto w-full object-cover"
-                    height={720}
-                    src="/main_page/product.png"
-                    width={960}
-                  />
-                </div>
-              </article>
-              <article className="relative overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.04] p-3 backdrop-blur-xl transition hover:border-indigo-400/30 hover:shadow-[0_0_70px_rgba(129,140,248,0.16)]">
-                <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(129,140,248,0.8),transparent)]" />
-                <p className="px-2 pt-2 text-xs uppercase tracking-[0.22em] text-white/35">Negotiation engine</p>
-                <div className="mt-3 overflow-hidden rounded-[22px] border border-white/10 bg-black/30">
-                  <Image
-                    alt="Negotiation transcript"
-                    className="h-auto w-full object-cover"
-                    height={720}
-                    src="/main_page/negotiate.png"
-                    width={960}
-                  />
-                </div>
-              </article>
-            </div>
+            <aside
+              className="relative h-[620px] rounded-[36px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.02),0_40px_120px_rgba(79,70,229,0.12)]"
+              onMouseLeave={() => setActiveHeroProduct(null)}
+            >
+              {heroProducts.map((product, index) => {
+                const layout = heroProductLayout[index];
+                const isActive = activeHeroProduct === index;
+                return (
+                  <div
+                    className={`absolute ${layout.wrapper} overflow-hidden rounded-[30px] border bg-black/35 transition-all duration-500 ease-out`}
+                    key={product.title}
+                    onMouseEnter={() => setActiveHeroProduct(index)}
+                    style={{
+                      zIndex: isActive ? 40 : layout.baseZIndex,
+                      transform: `rotate(${layout.rotation}) scale(${isActive ? 1.045 : 1}) translateY(${isActive ? "-10px" : "0px"})`,
+                      borderColor: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.10)",
+                      boxShadow: isActive
+                        ? "0 35px 120px rgba(79,70,229,0.22), 0 0 0 1px rgba(255,255,255,0.05)"
+                        : "0 30px 90px rgba(0,0,0,0.45)",
+                      filter: activeHeroProduct !== null && !isActive ? "brightness(0.78) saturate(0.9)" : "none",
+                    }}
+                  >
+                    <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent)] opacity-0 transition duration-300" style={{ opacity: isActive ? 1 : 0 }} />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt={product.title}
+                      className={`${layout.image} w-full object-cover transition duration-500 ${isActive ? "scale-[1.04]" : "scale-100"}`}
+                      src={product.image}
+                    />
+                  </div>
+                );
+              })}
+              <div className="absolute left-6 top-8 h-40 w-40 rounded-full bg-indigo-500/18 blur-3xl" />
+              <div className="absolute bottom-12 right-6 h-36 w-36 rounded-full bg-cyan-400/15 blur-3xl" />
+            </aside>
           </div>
         </section>
 

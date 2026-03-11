@@ -29,44 +29,83 @@ type FriendlyEvent = {
 
 function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
   const type = event.type.toLowerCase();
+  const message = event.message.toLowerCase();
 
-  if (type.includes("scan") || type.includes("collect")) {
+  if (type === "scan_started") {
     return {
-      title: "正在收集可选商品",
+      title: "Parsing Request",
       detail: event.message,
     };
   }
 
-  if (type.includes("price") || type.includes("budget")) {
+  if (type === "scan_progress") {
+    if (message.includes("long-term memory")) {
+      return {
+        title: "Loading User Memory",
+        detail: event.message,
+      };
+    }
+    if (message.includes("structured fields extracted")) {
+      return {
+        title: "Extracting Structured Fields",
+        detail: event.message,
+      };
+    }
+    if (message.includes("analysis")) {
+      return {
+        title: "Analyzing User Intent",
+        detail: event.message,
+      };
+    }
+    if (message.includes("query") || message.includes("database") || message.includes("search")) {
+      return {
+        title: "Searching Product Data",
+        detail: event.message,
+      };
+    }
     return {
-      title: "正在核对预算",
+      title: "Processing Pipeline Step",
       detail: event.message,
     };
   }
 
-  if (type.includes("plan") || type.includes("ready")) {
+  if (type === "candidate_found") {
     return {
-      title: "正在整理推荐方案",
+      title: "Products Matched",
       detail: event.message,
     };
   }
 
-  if (type.includes("message") || type.includes("response")) {
+  if (type === "bundle_built") {
     return {
-      title: "正在生成回复",
+      title: "Building Recommendation Bundles",
+      detail: event.message,
+    };
+  }
+
+  if (type === "plan_ready") {
+    return {
+      title: "Recommendations Ready",
+      detail: event.message,
+    };
+  }
+
+  if (type === "done") {
+    return {
+      title: "Pipeline Complete",
       detail: event.message,
     };
   }
 
   if (type.includes("error")) {
     return {
-      title: "流程中断",
+      title: "Pipeline Error",
       detail: event.message,
     };
   }
 
   return {
-    title: "正在处理需求",
+    title: "Pipeline Update",
     detail: event.message,
   };
 }
@@ -528,7 +567,10 @@ export default function ChatWorkspacePage() {
           <div className="flex items-center justify-between border-b border-[#ddd5c8] pb-4">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-[#7b6a55]">AI Process</p>
-              <h2 className="mt-1 text-lg font-semibold">Thinking and execution</h2>
+              <h2 className="mt-1 text-lg font-semibold">Pipeline Log</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Live backend events from parsing, search, and bundle generation.
+              </p>
             </div>
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -541,18 +583,11 @@ export default function ChatWorkspacePage() {
             </span>
           </div>
 
-          <div className="mt-4 space-y-2 rounded-2xl border border-[#dfd8cb] bg-[#f8f5ef] p-3">
-            <p className="text-xs text-slate-600">
-              Live logs from <code>user_content_analysis</code> and <code>query_data</code> are shown below.
-            </p>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-[#dfd8cb] bg-[#fbfaf7] p-3">
-            <h3 className="text-sm font-semibold text-[#6d5d49]">Live execution log</h3>
-            <div className="mt-3 max-h-[40vh] space-y-2 overflow-y-auto pr-1">
+          <div className="mt-4 flex min-h-[70vh] flex-col rounded-2xl border border-[#dfd8cb] bg-[#fbfaf7] p-3">
+            <div className="flex-1 space-y-2 overflow-y-auto pr-1">
               {timelinePreview.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-[#d9d2c5] px-3 py-3 text-xs text-slate-500">
-                  After you send a message, real backend steps will appear here.
+                  Backend pipeline events will appear here after you send a request.
                 </p>
               ) : (
                 timelinePreview.map((event) => {

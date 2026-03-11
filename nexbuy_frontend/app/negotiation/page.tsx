@@ -15,7 +15,7 @@ import {
   type NegotiationSession,
   type NegotiationTurn,
 } from "@/lib/negotiation-api";
-import { writeNegotiatedDeal } from "@/lib/negotiation-store";
+import { readNegotiationRuns, writeNegotiatedDeal, writeNegotiationRun } from "@/lib/negotiation-store";
 
 type ChatBubble = {
   id: string;
@@ -60,6 +60,32 @@ function buildSellerBubble(turn: NegotiationTurn): ChatBubble {
   };
 }
 
+function buildBuyerAgentBubble(turn: BuyerAgentTurn): ChatBubble {
+  return {
+    id: `agent-buyer-${turn.round_index}-${turn.created_at}`,
+    role: "buyer",
+    label: "Buyer Agent",
+    content: turn.buyer_message,
+    meta: [
+      turn.buyer_offer ? `Offer: ${formatMoney(turn.buyer_offer)}` : null,
+      `Strategy: ${turn.rationale}`,
+      turn.llm_decision_verified === false ? `Fallback: ${turn.llm_verification_note ?? "used safe policy"}` : null,
+    ]
+      .filter(Boolean)
+      .join(" | "),
+  };
+}
+
+function buildAgentTranscript(result: BuyerAgentRunResult): ChatBubble[] {
+  return result.turns.flatMap((turn) => {
+    const bubbles: ChatBubble[] = [buildBuyerAgentBubble(turn)];
+    if (turn.seller_turn) {
+      bubbles.push({ ...buildSellerBubble(turn.seller_turn), label: "Seller Agent" });
+    }
+    return bubbles;
+  });
+}
+
 export default function NegotiationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -92,6 +118,39 @@ export default function NegotiationPage() {
   }, [price]);
 
   useEffect(() => {
+    if (!sku) {
+      return;
+    }
+
+    const storedRuns = readNegotiationRuns();
+    const stored = storedRuns[sku];
+    if (!stored) {
+      return;
+    }
+
+    setMode("agent");
+    setAgentMessages(
+      stored.result
+        ? buildAgentTranscript(stored.result)
+        : stored.turns.flatMap((turn) => {
+            const bubbles: ChatBubble[] = [buildBuyerAgentBubble(turn)];
+            if (turn.seller_turn) {
+              bubbles.push({ ...buildSellerBubble(turn.seller_turn), label: "Seller Agent" });
+            }
+            return bubbles;
+          }),
+    );
+    setSession(stored.result?.seller_session ?? stored.sellerSession);
+    setStatus(stored.progressLabel);
+    setThinkingMessage(null);
+    setError("");
+    setTargetPrice(String(stored.targetPrice));
+    setMaxAcceptablePrice(String(stored.maxAcceptablePrice));
+    setAgentResult(stored.result ?? null);
+    setIsRunningAgent(stored.status === "running");
+  }, [sku]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function bootstrap() {
@@ -100,6 +159,8 @@ export default function NegotiationPage() {
         setStatus("Cannot open negotiation.");
         return;
       }
+
+      const storedRun = readNegotiationRuns()[sku];
 
       const token = readAccessToken();
       if (!token) {
@@ -143,9 +204,11 @@ export default function NegotiationPage() {
         setManualSession(created);
         setSession(created);
         setManualMessages(initialMessages);
-        setMessages([]);
-        setStatus("Set your target and max acceptable prices, then run the buyer agent.");
-        if (price) {
+        if (!storedRun) {
+          setMessages([]);
+          setStatus("Set your target and max acceptable prices, then run the buyer agent.");
+        }
+        if (price && !storedRun) {
           const numericPrice = Number(price);
           setTargetPrice(String(Math.round(numericPrice * 0.9)));
           setMaxAcceptablePrice(String(Math.round(numericPrice * 0.95)));
@@ -269,22 +332,6 @@ export default function NegotiationPage() {
     }
   }, [agentResult, isRunningAgent, manualSession, mode]);
 
-  function buildBuyerAgentBubble(turn: BuyerAgentTurn): ChatBubble {
-    return {
-      id: `agent-buyer-${turn.round_index}-${turn.created_at}`,
-      role: "buyer",
-      label: "Buyer Agent",
-      content: turn.buyer_message,
-      meta: [
-        turn.buyer_offer ? `Offer: ${formatMoney(turn.buyer_offer)}` : null,
-        `Strategy: ${turn.rationale}`,
-        turn.llm_decision_verified === false ? `Fallback: ${turn.llm_verification_note ?? "used safe policy"}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | "),
-    };
-  }
-
   function buildStreamEvent(event: BuyerAgentStreamEvent) {
     if (event.type === "thinking") {
       setThinkingMessage(event.message);
@@ -313,8 +360,25 @@ export default function NegotiationPage() {
     if (event.type === "done") {
       setThinkingMessage(null);
       setAgentResult(event.result);
+      setIsRunningAgent(false);
       setSession(event.result.seller_session);
       setStatus(event.result.summary);
+      writeNegotiationRun({
+        sku,
+        title,
+        originalPrice: Number(price ?? 0),
+        planId,
+        planTitle,
+        targetPrice: event.result.target_price,
+        maxAcceptablePrice: event.result.max_acceptable_price,
+        status: "done",
+        progressLabel: event.result.summary,
+        progressPercent: 100,
+        turns: event.result.turns,
+        sellerSession: event.result.seller_session,
+        result: event.result,
+        savedAt: new Date().toISOString(),
+      });
       if (event.result.outcome === "accepted" && typeof event.result.final_price === "number") {
         writeNegotiatedDeal({
           sku,
@@ -331,6 +395,7 @@ export default function NegotiationPage() {
 
     if (event.type === "error") {
       setThinkingMessage(null);
+      setIsRunningAgent(false);
       setError(event.error);
       setStatus("Buyer agent negotiation failed.");
     }

@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
+  fetchPlazaRecommendations,
   fetchPlazaShowcaseDetail,
   fetchPlazaShowcases,
   seedMockPlazaShowcases,
+  type PlazaRecommendationProduct,
+  type PlazaRecommendations,
   type PlazaShowcaseDetail,
   type PlazaShowcaseSummary,
 } from "@/lib/plaza-api";
@@ -70,6 +74,10 @@ export default function PlazaPage() {
   const [error, setError] = useState("");
   const [showcases, setShowcases] = useState<PlazaShowcaseSummary[]>([]);
   const [selectedShowcase, setSelectedShowcase] = useState<PlazaShowcaseDetail | null>(null);
+  const [recommendations, setRecommendations] = useState<PlazaRecommendations | null>(null);
+  const [recommendationError, setRecommendationError] = useState("");
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +85,8 @@ export default function PlazaPage() {
     async function bootstrap() {
       setIsBootstrapping(true);
       setError("");
+      setIsLoadingRecommendations(true);
+      setRecommendationError("");
 
       try {
         let list = await fetchPlazaShowcases();
@@ -94,6 +104,38 @@ export default function PlazaPage() {
             setSelectedShowcase(detail);
           }
         }
+
+        const token = readAccessToken();
+        if (token) {
+          try {
+            await fetchCurrentUser(token);
+            if (!cancelled) {
+              setIsAuthenticated(true);
+            }
+            try {
+              const recommendationPayload = await fetchPlazaRecommendations();
+              if (!cancelled) {
+                setRecommendations(recommendationPayload);
+              }
+            } catch (recommendationLoadError) {
+              if (!cancelled) {
+                setRecommendationError(
+                  recommendationLoadError instanceof Error
+                    ? recommendationLoadError.message
+                    : "Could not load personalized recommendations.",
+                );
+              }
+            }
+          } catch {
+            if (!cancelled) {
+              setIsAuthenticated(false);
+              setRecommendations(null);
+            }
+          }
+        } else if (!cancelled) {
+          setIsAuthenticated(false);
+          setRecommendations(null);
+        }
       } catch (bootstrapError) {
         if (!cancelled) {
           setError(bootstrapError instanceof Error ? bootstrapError.message : "Could not load agent wins.");
@@ -101,6 +143,7 @@ export default function PlazaPage() {
       } finally {
         if (!cancelled) {
           setIsBootstrapping(false);
+          setIsLoadingRecommendations(false);
         }
       }
     }
@@ -127,6 +170,48 @@ export default function PlazaPage() {
     }
     return Math.max(...showcases.map((item) => item.total_saved_amount));
   }, [showcases]);
+
+  const recommendationProducts = recommendations?.products ?? [];
+
+  function renderRecommendationCard(product: PlazaRecommendationProduct) {
+    return (
+      <article
+        className="overflow-hidden rounded-[24px] border border-[#ece7df] bg-white shadow-[0_10px_24px_rgba(24,24,27,0.04)]"
+        key={product.sku_id_default}
+      >
+        <div className="h-56 bg-[#f4f4f5]">
+          {product.main_image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt={product.title} className="h-full w-full object-cover" src={product.main_image_url} />
+          ) : null}
+        </div>
+        <div className="p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8b8177]">
+            {[product.category_name_2, product.category_name_3].filter(Boolean).join(" / ") || product.category_name_1 || "Product"}
+          </p>
+          <h3 className="mt-2 text-base font-bold leading-6 text-[#27272a]">{product.title}</h3>
+          <p className="mt-3 text-sm leading-6 text-[#5f564d]">{product.recommendation_reason}</p>
+          <div className="mt-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#8b8177]">Price</p>
+              <p className="mt-1 text-lg font-black text-[#18181b]">{formatMoney(product.sale_price ?? 0)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#8b8177]">Status</p>
+              <p className="mt-1 text-sm font-semibold text-[#22a06b]">{product.stock_status_text ?? "Available"}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {product.matched_memory_tags.map((tag) => (
+              <span className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-bold text-[#5b53d8]" key={`${product.sku_id_default}-${tag}`}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </article>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f5f5f4] text-[#18181b]">
@@ -282,6 +367,68 @@ export default function PlazaPage() {
                 </div>
               </div>
             ) : null}
+
+            <div className="mt-10 rounded-[30px] border border-[#ebe7df] bg-[#fcfcfb] p-6 md:p-8">
+              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8f5b18]">Recommended For You</p>
+                  <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#18110a]">
+                    Picks shaped by your saved memory profile
+                  </h2>
+                  <p className="mt-3 max-w-2xl text-base leading-7 text-[#5f564d]">
+                    {recommendations?.memory_summary ??
+                      "Sign in and complete your profile to unlock fast, memory-based product recommendations."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(recommendations?.reason_tags ?? []).map((tag) => (
+                    <span className="rounded-full border border-[#e4ddff] bg-[#f7f5ff] px-3 py-2 text-xs font-bold text-[#5b53d8]" key={tag}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {recommendationError ? (
+                <div className="mt-6 rounded-[22px] border border-[#fecaca] bg-[#fff1f2] px-5 py-4 text-sm font-medium text-[#b42318]">
+                  {recommendationError}
+                </div>
+              ) : null}
+
+              {isLoadingRecommendations ? (
+                <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div className="overflow-hidden rounded-[24px] border border-[#ece7df] bg-white" key={index}>
+                      <div className="h-56 animate-pulse bg-[#f4f4f5]" />
+                      <div className="space-y-3 p-4">
+                        <div className="h-3 w-24 animate-pulse rounded bg-[#f1f0eb]" />
+                        <div className="h-6 w-full animate-pulse rounded bg-[#f1f0eb]" />
+                        <div className="h-4 w-full animate-pulse rounded bg-[#f1f0eb]" />
+                        <div className="h-4 w-2/3 animate-pulse rounded bg-[#f1f0eb]" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {!isLoadingRecommendations && isAuthenticated && recommendations?.onboarding_required ? (
+                <div className="mt-8 rounded-[24px] border border-dashed border-[#d8d1c8] bg-white px-6 py-10 text-center text-sm text-[#6b645c]">
+                  Your account is signed in, but the memory profile is still empty. Complete onboarding to get tailored product picks here.
+                </div>
+              ) : null}
+
+              {!isLoadingRecommendations && !isAuthenticated ? (
+                <div className="mt-8 rounded-[24px] border border-dashed border-[#d8d1c8] bg-white px-6 py-10 text-center text-sm text-[#6b645c]">
+                  Sign in to load recommendations based on your saved style, room, household, and budget preferences.
+                </div>
+              ) : null}
+
+              {!isLoadingRecommendations && isAuthenticated && !recommendations?.onboarding_required && recommendationProducts.length > 0 ? (
+                <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  {recommendationProducts.map((product) => renderRecommendationCard(product))}
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
       </div>

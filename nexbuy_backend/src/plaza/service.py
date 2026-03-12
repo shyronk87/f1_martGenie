@@ -6,6 +6,9 @@ from typing import Any
 from sqlalchemy import Select, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.model.memory import get_profile
+from src.model.query_data.db import query_products
+from src.model.query_data.schema import QueryFilters
 from src.web.auth.models import User
 from src.web.plaza.models import AgentShowcaseItemRecord, AgentShowcaseRecord
 
@@ -14,6 +17,8 @@ from .schema import (
     AgentShowcaseDetail,
     AgentShowcaseItem,
     AgentShowcaseSummary,
+    PlazaRecommendationProduct,
+    PlazaRecommendationsOut,
 )
 
 
@@ -55,6 +60,131 @@ def _sentence_case(value: str | None) -> str:
         return "bundle"
     text_value = value.strip()
     return text_value[:1].upper() + text_value[1:]
+
+
+def _dedupe_keep_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        normalized = value.strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(normalized)
+    return out
+
+
+def _memory_summary_from_profile(profile: Any) -> str:
+    parts: list[str] = []
+    if profile.style_preferences:
+        parts.append(f"Style: {', '.join(profile.style_preferences[:2])}")
+    if profile.room_priorities:
+        parts.append(f"Room: {', '.join(profile.room_priorities[:2])}")
+    if profile.household_members:
+        parts.append(f"Household: {', '.join(profile.household_members[:2])}")
+    if profile.price_philosophy:
+        parts.append(f"Budget: {profile.price_philosophy}")
+    return " | ".join(parts) if parts else "Recommendations based on your saved preferences."
+
+
+def _reason_tags_from_profile(profile: Any) -> list[str]:
+    tags: list[str] = []
+    tags.extend(profile.style_preferences[:2])
+    tags.extend(profile.room_priorities[:2])
+    tags.extend(profile.household_members[:2])
+    if profile.price_philosophy:
+        tags.append(profile.price_philosophy)
+    return _dedupe_keep_order(tags)
+
+
+def _build_recommendation_filters(profile: Any) -> QueryFilters:
+    style_keywords = list(profile.style_preferences or [])
+    room_keywords = list(profile.room_priorities or [])
+    constraint_keywords = list(profile.negative_constraints or [])
+    item_categories = list(profile.function_preferences or [])
+
+    if any(member.lower() in {"cat", "dog"} for member in profile.household_members or []):
+        constraint_keywords.extend(["easy clean", "durable", "scratch"])
+    if any(member.lower() == "toddler" for member in profile.household_members or []):
+        constraint_keywords.extend(["rounded", "safe"])
+    if any(member.lower() == "senior" for member in profile.household_members or []):
+        item_categories.extend(["comfort", "support"])
+
+    max_budget: float | None = None
+    philosophy = (profile.price_philosophy or "").lower()
+    if philosophy == "value":
+        max_budget = 800
+    elif philosophy == "balanced":
+        max_budget = 1800
+    elif philosophy == "premium":
+        max_budget = 3200
+
+    query_text_parts: list[str] = []
+    query_text_parts.extend(style_keywords[:2])
+    query_text_parts.extend(room_keywords[:2])
+    query_text_parts.extend(item_categories[:2])
+
+    return QueryFilters(
+        query_text=" ".join(query_text_parts),
+        final_limit=8,
+        limit=8,
+        vector_top_k=1,
+        semantic_weight=0.0,
+        keyword_weight=1.0,
+        max_budget=max_budget,
+        style_keywords=_dedupe_keep_order(style_keywords),
+        room_keywords=_dedupe_keep_order(room_keywords),
+        item_categories=_dedupe_keep_order(item_categories),
+        constraint_keywords=_dedupe_keep_order(constraint_keywords),
+    )
+
+
+def _build_product_reason(product: Any, profile: Any) -> tuple[str, list[str]]:
+    tags: list[str] = []
+    searchable = " ".join(
+        [
+            str(product.title or ""),
+            str(product.category_name_1 or ""),
+            str(product.category_name_2 or ""),
+            str(product.category_name_3 or ""),
+            str(product.category_name_4 or ""),
+        ]
+    ).lower()
+
+    for style in profile.style_preferences or []:
+        if style.lower() in searchable:
+            tags.append(style)
+    for room in profile.room_priorities or []:
+        if room.lower() in searchable:
+            tags.append(room)
+
+    members = [member.lower() for member in profile.household_members or []]
+    if "cat" in members or "dog" in members:
+        tags.append("pet-friendly")
+    if "toddler" in members:
+        tags.append("family-safe")
+    if profile.price_philosophy:
+        tags.append(profile.price_philosophy)
+
+    tags = _dedupe_keep_order(tags)[:3]
+    reason_parts: list[str] = []
+    if profile.style_preferences:
+        reason_parts.append(f"matches your {profile.style_preferences[0]} taste")
+    if profile.room_priorities:
+        reason_parts.append(f"fits your {profile.room_priorities[0]} priority")
+    if "cat" in members or "dog" in members:
+        reason_parts.append("works for a pet-aware home")
+    elif "toddler" in members:
+        reason_parts.append("leans safer for family use")
+    elif profile.price_philosophy:
+        reason_parts.append(f"aligns with your {profile.price_philosophy} budget preference")
+
+    if not reason_parts:
+        reason_parts.append("fits your saved preference profile")
+    return "Recommended because it " + ", ".join(reason_parts[:2]) + ".", tags
 
 
 async def _fetch_products_by_sku(
@@ -395,3 +525,51 @@ async def create_mock_showcases(
         base_time = base_time - timedelta(days=3)
 
     return created_count
+
+
+async def get_memory_recommendations(
+    session: AsyncSession,
+    *,
+    user: User,
+) -> PlazaRecommendationsOut:
+    memory_response = await get_profile(session, user.id)
+    if memory_response.profile is None:
+        return PlazaRecommendationsOut(
+            onboarding_required=True,
+            memory_summary="Complete your profile to unlock tailored picks.",
+            reason_tags=[],
+            products=[],
+        )
+
+    profile = memory_response.profile
+    filters = _build_recommendation_filters(profile)
+    products = await query_products(filters)
+
+    recommendation_products: list[PlazaRecommendationProduct] = []
+    for product in products:
+        reason, matched_tags = _build_product_reason(product, profile)
+        recommendation_products.append(
+            PlazaRecommendationProduct(
+                sku_id_default=product.sku_id_default,
+                spu_id=product.spu_id,
+                title=product.title,
+                category_name_1=product.category_name_1,
+                category_name_2=product.category_name_2,
+                category_name_3=product.category_name_3,
+                category_name_4=product.category_name_4,
+                sale_price=_money(product.sale_price),
+                original_price=_money(product.original_price),
+                stock_status_text=product.stock_status_text,
+                main_image_url=product.main_image_url,
+                product_url=product.product_url,
+                recommendation_reason=reason,
+                matched_memory_tags=matched_tags,
+            )
+        )
+
+    return PlazaRecommendationsOut(
+        onboarding_required=False,
+        memory_summary=_memory_summary_from_profile(profile),
+        reason_tags=_reason_tags_from_profile(profile),
+        products=recommendation_products,
+    )

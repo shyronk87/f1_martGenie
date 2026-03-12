@@ -3,8 +3,20 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.plaza import AgentShowcaseCreateIn, AgentShowcaseDetail, AgentShowcaseMockSeedOut, AgentShowcaseSummary
-from src.plaza.service import create_mock_showcases, create_showcase, get_showcase_detail, list_showcases
+from src.plaza import (
+    AgentShowcaseCreateIn,
+    AgentShowcaseDetail,
+    AgentShowcaseMockSeedOut,
+    AgentShowcaseSummary,
+    PlazaRecommendationsOut,
+)
+from src.plaza.service import (
+    create_mock_showcases,
+    create_showcase,
+    get_memory_recommendations,
+    get_showcase_detail,
+    list_showcases,
+)
 from src.web.auth.db import get_async_session
 from src.web.auth.dependencies import CurrentActiveUser
 from src.web.auth.models import User
@@ -56,3 +68,11 @@ async def seed_mock_showcases(
 
     total_count = len(await list_showcases(session, limit=100))
     return AgentShowcaseMockSeedOut(created_count=created_count, total_count=total_count)
+
+
+@router.get("/recommendations/me", response_model=PlazaRecommendationsOut)
+async def fetch_memory_recommendations(
+    user: User = Depends(CurrentActiveUser),
+    session: AsyncSession = Depends(get_async_session),
+) -> PlazaRecommendationsOut:
+    return await get_memory_recommendations(session, user=user)

@@ -77,3 +77,27 @@ class AgentShowcaseDetail(AgentShowcaseSummary):
 class AgentShowcaseMockSeedOut(BaseModel):
     created_count: int
     total_count: int
+
+
+class PlazaRecommendationProduct(BaseModel):
+    sku_id_default: str
+    spu_id: str | None = None
+    title: str
+    category_name_1: str | None = None
+    category_name_2: str | None = None
+    category_name_3: str | None = None
+    category_name_4: str | None = None
+    sale_price: float | None = None
+    original_price: float | None = None
+    stock_status_text: str | None = None
+    main_image_url: str | None = None
+    product_url: str | None = None
+    recommendation_reason: str
+    matched_memory_tags: list[str] = Field(default_factory=list)
+
+
+class PlazaRecommendationsOut(BaseModel):
+    onboarding_required: bool
+    memory_summary: str
+    reason_tags: list[str] = Field(default_factory=list)
+    products: list[PlazaRecommendationProduct] = Field(default_factory=list)

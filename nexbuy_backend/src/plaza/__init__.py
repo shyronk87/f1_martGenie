@@ -4,8 +4,10 @@ from .schema import (
     AgentShowcaseItem,
     AgentShowcaseMockSeedOut,
     AgentShowcaseSummary,
+    PlazaRecommendationProduct,
+    PlazaRecommendationsOut,
 )
-from .service import create_mock_showcases, create_showcase, get_showcase_detail, list_showcases
+from .service import create_mock_showcases, create_showcase, get_memory_recommendations, get_showcase_detail, list_showcases
 
 __all__ = [
     "AgentShowcaseCreateIn",
@@ -13,8 +15,11 @@ __all__ = [
     "AgentShowcaseItem",
     "AgentShowcaseMockSeedOut",
     "AgentShowcaseSummary",
+    "PlazaRecommendationProduct",
+    "PlazaRecommendationsOut",
     "create_mock_showcases",
     "create_showcase",
+    "get_memory_recommendations",
     "get_showcase_detail",
     "list_showcases",
 ]

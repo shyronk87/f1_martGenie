@@ -40,6 +40,30 @@ export type PlazaShowcaseDetail = PlazaShowcaseSummary & {
   primary_categories: string[];
 };
 
+export type PlazaRecommendationProduct = {
+  sku_id_default: string;
+  spu_id: string | null;
+  title: string;
+  category_name_1: string | null;
+  category_name_2: string | null;
+  category_name_3: string | null;
+  category_name_4: string | null;
+  sale_price: number | null;
+  original_price: number | null;
+  stock_status_text: string | null;
+  main_image_url: string | null;
+  product_url: string | null;
+  recommendation_reason: string;
+  matched_memory_tags: string[];
+};
+
+export type PlazaRecommendations = {
+  onboarding_required: boolean;
+  memory_summary: string;
+  reason_tags: string[];
+  products: PlazaRecommendationProduct[];
+};
+
 type SeedResponse = {
   created_count: number;
   total_count: number;
@@ -74,6 +98,13 @@ export async function seedMockPlazaShowcases(): Promise<SeedResponse> {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<SeedResponse>(response, "Could not seed mock showcase records.");
+}
+
+export async function fetchPlazaRecommendations(): Promise<PlazaRecommendations> {
+  const response = await fetch(`${getApiBaseUrl()}/plaza/recommendations/me`, {
+    headers: buildAuthHeaders(),
+  });
+  return parseJsonResponse<PlazaRecommendations>(response, "Could not load personalized recommendations.");
 }
 
 async function parseJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {

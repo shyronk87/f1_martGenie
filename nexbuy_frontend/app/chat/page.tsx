@@ -147,54 +147,68 @@ function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
 
 export default function ChatWorkspacePage() {
   const router = useRouter();
-  const initialWorkspaceRef = useRef<SavedWorkspaceState | null>(null);
-  if (initialWorkspaceRef.current === null && typeof window !== "undefined") {
-    try {
-      const raw = window.sessionStorage.getItem(WORKSPACE_STORAGE_KEY);
-      initialWorkspaceRef.current = raw ? (JSON.parse(raw) as SavedWorkspaceState) : null;
-    } catch {
-      window.sessionStorage.removeItem(WORKSPACE_STORAGE_KEY);
-      initialWorkspaceRef.current = null;
-    }
-  }
-
-  const restoredWorkspace = initialWorkspaceRef.current;
-  const [sessionId, setSessionId] = useState<string | null>(restoredWorkspace?.sessionId ?? null);
-  const [messages, setMessages] = useState<ChatMessage[]>(restoredWorkspace?.messages ?? []);
-  const [timeline, setTimeline] = useState<TimelineEvent[]>(restoredWorkspace?.timeline ?? []);
-  const [plans, setPlans] = useState<PlanOption[]>(restoredWorkspace?.plans ?? []);
-  const [activePlanId, setActivePlanId] = useState<string | null>(restoredWorkspace?.activePlanId ?? null);
+  const [isWorkspaceHydrated, setIsWorkspaceHydrated] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [plans, setPlans] = useState<PlanOption[]>([]);
+  const [activePlanId, setActivePlanId] = useState<string | null>(null);
   const [showOrderConfirm, setShowOrderConfirm] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [orderResult, setOrderResult] = useState<MockOrderResponse | null>(restoredWorkspace?.orderResult ?? null);
+  const [orderResult, setOrderResult] = useState<MockOrderResponse | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestion[]>([]);
   const [onboardingAnswers, setOnboardingAnswers] = useState<Record<string, string | string[]>>({});
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
   const [bootstrapNonce, setBootstrapNonce] = useState(0);
   const [negotiatedDeals, setNegotiatedDeals] = useState<Record<string, NegotiatedDeal>>({});
-  const [inlineNegotiations, setInlineNegotiations] = useState<Record<string, InlineNegotiationState>>(
-    restoredWorkspace?.inlineNegotiations ?? {},
-  );
-  const [expandedNegotiationSku, setExpandedNegotiationSku] = useState<string | null>(
-    restoredWorkspace?.expandedNegotiationSku ?? null,
-  );
+  const [inlineNegotiations, setInlineNegotiations] = useState<Record<string, InlineNegotiationState>>({});
+  const [expandedNegotiationSku, setExpandedNegotiationSku] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
-  const [status, setStatus] = useState(restoredWorkspace?.status ?? "Preparing workspace...");
+  const [status, setStatus] = useState("Preparing workspace...");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [runElapsedSec, setRunElapsedSec] = useState(0);
   const [streamText, setStreamText] = useState("");
   const streamTextRef = useRef("");
-  const plansRef = useRef<PlanOption[]>(restoredWorkspace?.plans ?? []);
+  const plansRef = useRef<PlanOption[]>([]);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const runStartRef = useRef<number | null>(null);
-  const restoredWorkspaceRef = useRef(Boolean(restoredWorkspace));
+  const restoredWorkspaceRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      const raw = window.sessionStorage.getItem(WORKSPACE_STORAGE_KEY);
+      const restoredWorkspace = raw ? (JSON.parse(raw) as SavedWorkspaceState) : null;
+
+      if (restoredWorkspace) {
+        setSessionId(restoredWorkspace.sessionId);
+        setMessages(restoredWorkspace.messages);
+        setTimeline(restoredWorkspace.timeline);
+        setPlans(restoredWorkspace.plans);
+        setActivePlanId(restoredWorkspace.activePlanId);
+        setStatus(restoredWorkspace.status);
+        setOrderResult(restoredWorkspace.orderResult);
+        setInlineNegotiations(restoredWorkspace.inlineNegotiations);
+        setExpandedNegotiationSku(restoredWorkspace.expandedNegotiationSku);
+        plansRef.current = restoredWorkspace.plans;
+        restoredWorkspaceRef.current = true;
+      }
+    } catch {
+      window.sessionStorage.removeItem(WORKSPACE_STORAGE_KEY);
+    } finally {
+      setIsWorkspaceHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isWorkspaceHydrated || typeof window === "undefined") {
       return;
     }
 
@@ -211,7 +225,7 @@ export default function ChatWorkspacePage() {
     };
 
     window.sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(payload));
-  }, [activePlanId, expandedNegotiationSku, inlineNegotiations, messages, orderResult, plans, sessionId, status, timeline]);
+  }, [activePlanId, expandedNegotiationSku, inlineNegotiations, isWorkspaceHydrated, messages, orderResult, plans, sessionId, status, timeline]);
 
   useEffect(() => {
     if (!isSending) {
@@ -247,13 +261,17 @@ export default function ChatWorkspacePage() {
   }, []);
 
   useEffect(() => {
+    if (!isWorkspaceHydrated) {
+      return;
+    }
+
     let unmounted = false;
 
     async function bootstrap() {
       const token = readAccessToken();
       if (!token) {
-        setStatus("No active session. Please sign in first.");
-        setError("Missing access token.");
+        setStatus("Sign in to start your shopping workspace.");
+        setError("You need to sign in before using chat.");
         return;
       }
 
@@ -293,7 +311,7 @@ export default function ChatWorkspacePage() {
             ? bootstrapError.message
             : "Could not initialize workspace.";
         setError(message);
-        setStatus("Session validation failed. Sign in again.");
+        setStatus("We could not open your workspace. Please sign in again.");
       }
     }
 
@@ -303,7 +321,7 @@ export default function ChatWorkspacePage() {
       unmounted = true;
       unsubscribeRef.current?.();
     };
-  }, [bootstrapNonce]);
+  }, [bootstrapNonce, isWorkspaceHydrated]);
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

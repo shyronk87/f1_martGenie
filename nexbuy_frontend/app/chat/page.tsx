@@ -187,6 +187,7 @@ export default function ChatWorkspacePage() {
   const [runElapsedSec, setRunElapsedSec] = useState(0);
   const [streamText, setStreamText] = useState("");
   const streamTextRef = useRef("");
+  const plansRef = useRef<PlanOption[]>(restoredWorkspace?.plans ?? []);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const runStartRef = useRef<number | null>(null);
   const restoredWorkspaceRef = useRef(Boolean(restoredWorkspace));
@@ -362,6 +363,7 @@ export default function ChatWorkspacePage() {
 
         if (eventPayload.type === "plan_ready") {
           setPlans(eventPayload.plans);
+          plansRef.current = eventPayload.plans;
           if (eventPayload.plans.length > 0) {
             setActivePlanId(eventPayload.plans[0].id);
           }
@@ -393,6 +395,11 @@ export default function ChatWorkspacePage() {
           streamTextRef.current = "";
           setIsSending(false);
           setStatus("Done. You can refine requirements or ask for alternatives.");
+          if (plansRef.current.length > 0) {
+            window.setTimeout(() => {
+              router.push("/recommendations");
+            }, 180);
+          }
         }
       });
     } catch (sendError) {
@@ -955,44 +962,44 @@ export default function ChatWorkspacePage() {
           {error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null}
         </section>
 
-        <aside className="h-[86vh] overflow-hidden rounded-[28px] border border-[#e2ddd3] bg-[#f2eee7] p-4 md:p-5">
-          <div className="flex items-center justify-between border-b border-[#ddd5c8] pb-4">
+        <aside className="h-[86vh] overflow-hidden rounded-[28px] border border-[#dbe3ed] bg-[linear-gradient(180deg,#f8fafd_0%,#eef2f7_100%)] p-4 shadow-[0_18px_50px_rgba(148,163,184,0.12)] md:p-5">
+          <div className="flex items-center justify-between border-b border-[#dce4ee] pb-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-[#7b6a55]">AI Process</p>
-              <h2 className="mt-1 text-lg font-semibold">Pipeline Log</h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">AI Process</p>
+              <h2 className="mt-1 text-lg font-semibold text-[#101828]">Pipeline Log</h2>
+              <p className="mt-1 text-xs text-[#667085]">
                 Live backend events from parsing, search, and bundle generation.
               </p>
             </div>
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
                 isSending
-                  ? "bg-[#d7e7f5] text-[#315d82]"
-                  : "bg-[#dcecdc] text-[#355f35]"
+                  ? "bg-[#dbeafe] text-[#1d4ed8]"
+                  : "bg-[#eaf2f8] text-[#475467]"
               }`}
             >
               {isSending ? "Running" : "Idle"}
             </span>
           </div>
 
-          <div className="mt-4 flex h-[calc(86vh-112px)] min-h-0 flex-col rounded-2xl border border-[#dfd8cb] bg-[#fbfaf7] p-3">
+          <div className="mt-4 flex h-[calc(86vh-112px)] min-h-0 flex-col rounded-2xl border border-[#dce4ee] bg-white/88 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
               {timeline.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-[#d9d2c5] px-3 py-3 text-xs text-slate-500">
+                <p className="rounded-xl border border-dashed border-[#dbe3ed] px-3 py-3 text-xs text-[#667085]">
                   Backend pipeline events will appear here after you send a request.
                 </p>
               ) : (
                 timeline.map((event) => {
                   const friendly = buildFriendlyEvent(event);
                   return (
-                    <article className="rounded-xl border border-[#e5dfd3] bg-white px-3 py-3" key={event.id}>
+                    <article className="rounded-xl border border-[#e4eaf1] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-3 shadow-[0_8px_22px_rgba(148,163,184,0.08)]" key={event.id}>
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold text-[#3f5970]">{friendly.title}</p>
-                        <p className="text-[11px] text-slate-400">
+                        <p className="text-xs font-semibold text-[#1f3b57]">{friendly.title}</p>
+                        <p className="text-[11px] text-[#98a2b3]">
                           {new Date(event.createdAt).toLocaleTimeString()}
                         </p>
                       </div>
-                      <p className="mt-1 text-xs text-slate-600">{friendly.detail}</p>
+                      <p className="mt-1 text-xs text-[#667085]">{friendly.detail}</p>
                     </article>
                   );
                 })
@@ -1002,444 +1009,6 @@ export default function ChatWorkspacePage() {
 
         </aside>
       </div>
-      <section className="mx-auto mt-4 w-full max-w-[1500px] rounded-[28px] border border-slate-200 bg-slate-50 p-4 md:p-5">
-        <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-500">AI Proposal Linkage Console</p>
-            <h3 className="mt-1 text-base font-semibold text-slate-800">Decision layer + execution layer</h3>
-          </div>
-          {orderResult ? (
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">
-              Order placed: {orderResult.order_id}
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-5 space-y-5">
-          {displayedPlans.length === 0 ? (
-            <p className="text-sm text-slate-500">No result bundle yet.</p>
-          ) : (
-            <>
-              <div className="grid gap-4 xl:grid-cols-3">
-                {displayedPlans.map((plan) => {
-                  const isActive = activePlan?.id === plan.id;
-                  const planSavings = plan.items.reduce((sum, item) => {
-                    const deal = negotiatedDeals[item.sku];
-                    return sum + (deal ? Math.max(0, deal.originalPrice - deal.negotiatedPrice) : 0);
-                  }, 0);
-                  const hiddenItemCount = Math.max(0, plan.items.length - 3);
-                  return (
-                    <button
-                      className={`flex min-h-[348px] flex-col justify-between rounded-[26px] border p-4 text-left transition ${
-                        isActive
-                          ? "border-indigo-200 bg-white shadow-[0_18px_50px_rgba(79,70,229,0.12)]"
-                          : "border-slate-200 bg-white hover:border-indigo-100 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)]"
-                      }`}
-                      key={plan.id}
-                      onFocus={() => setActivePlanId(plan.id)}
-                      onMouseEnter={() => setActivePlanId(plan.id)}
-                      onClick={() => setActivePlanId(plan.id)}
-                      type="button"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-500">
-                            {isActive ? "Active bundle" : "Bundle option"}
-                          </p>
-                          <h4 className="mt-2 flex items-center gap-2 text-xl font-black text-slate-900">
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-50 text-sm text-amber-500">
-                              ✦
-                            </span>
-                            <span>{plan.title}</span>
-                          </h4>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                            {Math.round(plan.confidence * 100)}% · {plan.confidence >= 0.9 ? "Perfect Match" : plan.confidence >= 0.85 ? "Value Pick" : "Smart Option"}
-                          </span>
-                          <span className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-indigo-100 text-[11px] font-bold text-indigo-600">
-                            {Math.round(plan.confidence * 100)}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-600">{plan.summary}</p>
-                      {plan.explanation ? (
-                        <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-6 text-slate-600">
-                          {plan.explanation}
-                        </p>
-                      ) : null}
-                      <div className="mt-4 flex items-center">
-                        {plan.items.slice(0, 3).map((item, index) => (
-                          <div
-                            className={`relative h-16 w-16 overflow-hidden rounded-2xl border-2 border-white bg-slate-100 shadow-sm ${index > 0 ? "-ml-3" : ""}`}
-                            key={`${plan.id}-${item.sku}-thumb`}
-                          >
-                            {item.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                alt={item.title}
-                                className="h-full w-full object-cover"
-                                src={item.imageUrl}
-                              />
-                            ) : (
-                              <div className="h-full w-full bg-[linear-gradient(135deg,#cbd5e1,#f8fafc)]" />
-                            )}
-                          </div>
-                        ))}
-                        {hiddenItemCount > 0 ? (
-                          <div className="-ml-3 flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-white bg-slate-900 text-xs font-bold text-white shadow-sm">
-                            +{hiddenItemCount}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="mt-4 flex items-end justify-between gap-3">
-                        <div>
-                          <p className="text-xs text-slate-500">Bundle total</p>
-                          <p className="text-3xl font-black text-slate-950">${plan.totalPrice.toLocaleString()}</p>
-                          {planSavings > 0 ? (
-                            <p className="mt-1 text-xs font-semibold text-emerald-500">
-                              Estimated savings: -${planSavings.toLocaleString()}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span
-                          className={`rounded-2xl px-3 py-2 text-xs font-semibold ${
-                            isActive
-                              ? "bg-indigo-600 text-white"
-                              : "border border-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {isActive ? "Selected" : "Inspect"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
-                <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] md:p-5">
-                  {activePlan ? (
-                    <>
-                      <div className="flex flex-col gap-4 border-b border-slate-200 pb-4 md:flex-row md:items-end md:justify-between">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-500">Execution Layer</p>
-                          <h4 className="mt-2 text-3xl font-black text-slate-950">{activePlan.title}</h4>
-                          <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">{activePlan.summary}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800"
-                            onClick={() => setShowOrderConfirm(true)}
-                            type="button"
-                          >
-                            Place order
-                          </button>
-                          <button
-                            className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(79,70,229,0.28)] hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={activePlan.items.length === 0}
-                            onClick={handleOpenNegotiation}
-                            type="button"
-                          >
-                            ✨ AI Bargain
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mt-5 grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {activePlan.items.map((item) => {
-                          const inlineNegotiation = inlineNegotiations[item.sku];
-                          const isNegotiationOpen = expandedNegotiationSku === item.sku;
-                          return (
-                          <article className="flex flex-col rounded-2xl bg-white p-3 shadow-sm transition hover:shadow-md" key={`${activePlan.id}-${item.sku}`}>
-                            {item.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                alt={item.title}
-                                className="aspect-[4/3] w-full rounded-2xl object-cover"
-                                src={item.imageUrl}
-                              />
-                            ) : (
-                              <div className="aspect-[4/3] w-full rounded-2xl bg-[linear-gradient(135deg,#cbd5e1,#f8fafc)]" />
-                            )}
-                            <div className="mt-3 flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-bold text-slate-900">{item.title}</p>
-                                <p className="mt-2 text-xs leading-5 text-slate-500">{item.reason}</p>
-                              </div>
-                              {negotiatedDeals[item.sku] ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-500">
-                                  <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]" />
-                                  Negotiated
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="mt-auto pt-4">
-                              <div className="rounded-2xl bg-slate-50 p-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                    Current price
-                                  </p>
-                                  <div className="mt-1 flex items-end gap-2">
-                                    <p
-                                      className={`text-3xl font-black leading-none ${
-                                        negotiatedDeals[item.sku] ? "text-emerald-500" : "text-slate-950"
-                                      }`}
-                                    >
-                                      ${item.price.toLocaleString()}
-                                    </p>
-                                    {negotiatedDeals[item.sku] ? (
-                                      <p className="pb-1 text-xs font-medium text-slate-400 line-through">
-                                        ${negotiatedDeals[item.sku].originalPrice.toLocaleString()}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                </div>
-                                {item.productUrl ? (
-                                  <a
-                                    className="mt-1 text-[11px] font-semibold text-indigo-600 hover:underline"
-                                    href={item.productUrl}
-                                    rel="noreferrer"
-                                    target="_blank"
-                                  >
-                                    View details
-                                  </a>
-                                ) : null}
-                              </div>
-                              <button
-                                className={`mt-3 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-white ${
-                                  negotiatedDeals[item.sku]
-                                    ? "bg-emerald-500 hover:bg-emerald-400"
-                                    : "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500"
-                                }`}
-                                onClick={() => handleOpenItemNegotiation(activePlan, item)}
-                                type="button"
-                              >
-                                {inlineNegotiation?.result || negotiatedDeals[item.sku]
-                                  ? "💰 Manage Negotiation"
-                                  : "✨ Let AI Negotiate"}
-                              </button>
-                              </div>
-                            </div>
-                            {isNegotiationOpen ? (
-                              <div className="mt-3 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3">
-                                <div className="space-y-3">
-                                  <label className="space-y-1">
-                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                      Target price
-                                    </span>
-                                    <input
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-300"
-                                      inputMode="decimal"
-                                      onChange={(event) => setInlineField(item.sku, "targetPrice", event.target.value)}
-                                      placeholder="e.g. 820"
-                                      value={inlineNegotiation?.targetPrice ?? ""}
-                                    />
-                                  </label>
-                                  <label className="space-y-1">
-                                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                      Max acceptable
-                                    </span>
-                                    <input
-                                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-300"
-                                      inputMode="decimal"
-                                      onChange={(event) => setInlineField(item.sku, "maxAcceptablePrice", event.target.value)}
-                                      placeholder="e.g. 880"
-                                      value={inlineNegotiation?.maxAcceptablePrice ?? ""}
-                                    />
-                                  </label>
-                                </div>
-                                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                        Negotiation progress
-                                      </p>
-                                      <p className="mt-1 text-sm font-medium text-slate-700">
-                                        {inlineNegotiation?.progressLabel ?? "Not started yet."}
-                                      </p>
-                                    </div>
-                                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-                                      {Math.round(inlineNegotiation?.progressPercent ?? 0)}%
-                                    </span>
-                                  </div>
-                                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-                                    <div
-                                      className={`h-full rounded-full transition-all ${
-                                        inlineNegotiation?.isRunning
-                                          ? "bg-gradient-to-r from-indigo-600 to-violet-600"
-                                          : inlineNegotiation?.result
-                                            ? "bg-emerald-500"
-                                            : "bg-slate-300"
-                                      }`}
-                                      style={{ width: `${inlineNegotiation?.progressPercent ?? 0}%` }}
-                                    />
-                                  </div>
-                                  {inlineNegotiation?.error ? (
-                                    <p className="mt-2 text-xs text-rose-600">{inlineNegotiation.error}</p>
-                                  ) : null}
-                                </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  <button
-                                    className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(79,70,229,0.2)] hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
-                                    disabled={inlineNegotiation?.isRunning}
-                                    onClick={() => handleRunInlineNegotiation(activePlan, item)}
-                                    type="button"
-                                  >
-                                    {inlineNegotiation?.isRunning ? "Negotiating..." : "Auto bargain"}
-                                  </button>
-                                  <button
-                                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
-                                    disabled={!inlineNegotiation?.isRunning && !inlineNegotiation?.result}
-                                    onClick={() => handleViewNegotiation(activePlan, item)}
-                                    type="button"
-                                  >
-                                    View conversation
-                                  </button>
-                                </div>
-                              </div>
-                            ) : null}
-                          </article>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-
-                <aside className="xl:sticky xl:top-4 xl:self-start rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] p-4 text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] md:p-5">
-                  <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-400">Global Action Rail</p>
-                  <h4 className="mt-2 text-3xl font-black">Decision Snapshot</h4>
-                  {activePlan ? (
-                    <>
-                      <div className="mt-5 rounded-[24px] border border-white/10 bg-white/5 p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Progress</p>
-                        <div className="mt-3 overflow-hidden rounded-full bg-white/10">
-                          <div className="flex h-2 w-full">
-                            <div className="h-full w-1/3 bg-indigo-500" />
-                            <div className={`h-full w-1/3 ${activePlanNegotiatedCount > 0 ? "bg-emerald-500" : "bg-white/10"}`} />
-                            <div className={`h-full w-1/3 ${orderResult ? "bg-amber-400" : "bg-white/10"}`} />
-                          </div>
-                        </div>
-                        <div className="mt-3 flex justify-between text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                          <span>Search</span>
-                          <span>Negotiate</span>
-                          <span>Ready</span>
-                        </div>
-                      </div>
-                      <div className="mt-4 rounded-[24px] border border-white/10 bg-white/5 p-4">
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Current total</p>
-                        <p className="mt-2 text-4xl font-black">${activePlan.totalPrice.toLocaleString()}</p>
-                        <p className="mt-2 text-sm leading-6 text-slate-300">
-                          Compare at the bundle level first, then negotiate item-level pricing without losing the global picture.
-                        </p>
-                        {activePlanSavings > 0 ? (
-                          <p className="mt-3 text-sm font-semibold text-emerald-400">
-                            Saved so far: ${activePlanSavings.toLocaleString()}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="mt-4 space-y-3">
-                        <div className="rounded-[20px] bg-white/5 p-4">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-300">AI recommendation signal</p>
-                          <p className="mt-2 text-sm font-semibold">{Math.round(activePlan.confidence * 100)}% fit score</p>
-                          <p className="mt-1 text-xs leading-5 text-slate-300">
-                            Confidence and explanation expose the backend ranking logic instead of hiding it.
-                          </p>
-                        </div>
-                        <div className="rounded-[20px] bg-white/5 p-4">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-300">AI certainty rating</p>
-                          <p className="mt-2 text-sm font-semibold">
-                            {activePlan.confidence >= 0.9 ? "High confidence" : activePlan.confidence >= 0.82 ? "Stable recommendation" : "Review carefully"}
-                          </p>
-                          <p className="mt-1 text-xs leading-5 text-slate-300">
-                            This score combines target coverage, pricing balance, and current negotiation leverage.
-                          </p>
-                        </div>
-                        <div className="rounded-[20px] bg-white/5 p-4">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Recommended next action</p>
-                          <p className="mt-2 text-sm font-semibold">
-                            {activePlan.items.some((item) => negotiatedDeals[item.sku])
-                              ? "Review negotiated items, then decide whether to place the order."
-                              : "Launch AI auto bargain on the lead item or go straight to checkout."}
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  ) : null}
-                  <div className="mt-5 flex flex-col gap-2">
-                    <button
-                      className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!activePlan}
-                      onClick={() => setShowOrderConfirm(true)}
-                      type="button"
-                    >
-                      Proceed to checkout
-                    </button>
-                    <button
-                      className="rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(79,70,229,0.28)] hover:from-indigo-500 hover:to-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!activePlan || activePlan.items.length === 0}
-                      onClick={handleOpenNegotiation}
-                      type="button"
-                    >
-                      ✨ AI Bargain
-                    </button>
-                  </div>
-                  <div className="mt-5 rounded-[20px] border border-white/10 bg-white/5 p-4 text-xs leading-6 text-slate-300">
-                    {orderResult ? (
-                      <>
-                        <p className="font-semibold text-white">Order status</p>
-                        <p className="mt-2">Order ID: {orderResult.order_id}</p>
-                        <p>Tracking: {orderResult.tracking_number}</p>
-                        <p>Carrier: {orderResult.carrier}</p>
-                        <p>Total: ${orderResult.total_amount.toLocaleString()} {orderResult.currency}</p>
-                      </>
-                    ) : (
-                      <p>No order placed yet. Use the action rail to negotiate or move directly to checkout.</p>
-                    )}
-                  </div>
-                </aside>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
-      {showOrderConfirm && activePlan ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5">
-            <h3 className="text-lg font-semibold text-slate-900">Confirm order</h3>
-            <p className="mt-1 text-sm text-slate-600">{activePlan.title}</p>
-            <div className="mt-4 space-y-2">
-              {activePlan.items.map((item) => (
-                <div className="flex items-center justify-between rounded-lg border border-slate-200 p-2" key={item.sku}>
-                  <p className="text-sm text-slate-800">{item.title}</p>
-                  <p className="text-sm font-semibold text-slate-900">${item.price.toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 text-sm font-semibold text-slate-900">
-              Total: ${activePlan.totalPrice.toLocaleString()}
-            </p>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700"
-                onClick={() => setShowOrderConfirm(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-[#2f6fa3] px-3 py-2 text-sm font-semibold text-white disabled:bg-[#9cb6cd]"
-                disabled={isPlacingOrder}
-                onClick={handleConfirmOrder}
-                type="button"
-              >
-                {isPlacingOrder ? "Paying..." : "Confirm payment"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
       {showOnboarding ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5">

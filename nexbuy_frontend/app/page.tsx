@@ -25,22 +25,28 @@ const systemHighlights = [
 
 const capabilityCards = [
   {
-    eyebrow: "Product graph",
-    title: "Structured recommendation surface",
-    copy: "The system turns product search into ranked bundle options with clear price anchors and fit confidence.",
-    image: "/main_page/product.png",
-  },
-  {
-    eyebrow: "Agent dialogue",
-    title: "Negotiation as a controllable workflow",
-    copy: "Buyer intent, seller response, and guard-rail validation are exposed as a live operating trace.",
-    image: "/main_page/negotiate.png",
-  },
-  {
-    eyebrow: "Execution console",
-    title: "Chat that behaves like an instrument panel",
-    copy: "Pipeline logs and plan generation read like a monitored system, not a generic assistant transcript.",
+    eyebrow: "Chat workspace",
+    title: "Start with one request and watch the workflow run",
+    copy: "Describe your room, budget, and must-have items in chat. Nexbuy turns that request into a tracked recommendation workflow with visible logs and plan output.",
     image: "/main_page/chat.png",
+    href: "/chat",
+    cta: "Open chat workspace",
+  },
+  {
+    eyebrow: "Product recommendations",
+    title: "Review shortlisted products and curated bundles",
+    copy: "Browse the products, showcase wins, and memory-based recommendations that Nexbuy surfaces after it understands what you are trying to buy.",
+    image: "/main_page/product.png",
+    href: "/plaza",
+    cta: "View recommendation plaza",
+  },
+  {
+    eyebrow: "Negotiation",
+    title: "Send the agent to bargain with clear price limits",
+    copy: "Move from recommendation to price action. The negotiation view shows buyer offers, seller responses, and the final deal path round by round.",
+    image: "/main_page/negotiate.png",
+    href: "/negotiation",
+    cta: "Go to negotiation view",
   },
 ];
 
@@ -80,6 +86,29 @@ const executionFeed = [
   "[03] 42 candidate SKUs matched across seating, storage, lighting",
   "[04] 3 bundle configurations scored for fit, risk, and spend",
   "[05] Buyer agent armed with target and max acceptable thresholds",
+];
+
+const footerColumns = [
+  {
+    title: "Product",
+    items: ["Chat workspace", "Recommendation plaza", "Negotiation flow", "Bundle planning"],
+  },
+  {
+    title: "Resources",
+    items: ["Getting started", "Use cases", "System guide", "Workflow notes"],
+  },
+  {
+    title: "Company",
+    items: ["About Nexbuy", "Roadmap", "Updates", "Contact"],
+  },
+  {
+    title: "Legal",
+    items: ["Privacy", "Terms", "Data handling", "Security"],
+  },
+  {
+    title: "Connect",
+    items: ["Email", "GitHub", "Community", "Feedback"],
+  },
 ];
 
 export default function HomePage() {
@@ -192,7 +221,7 @@ export default function HomePage() {
             </div>
 
             <aside
-              className="relative h-[620px] rounded-[36px] border border-[#dce3ed] bg-[linear-gradient(180deg,#ffffff_0%,#eef2f7_100%)] p-5 backdrop-blur-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.72),0_40px_120px_rgba(148,163,184,0.16)]"
+              className="relative h-[620px] rounded-[36px] p-5"
               onMouseLeave={() => setActiveHeroProduct(null)}
             >
               {heroProducts.map((product, index) => {
@@ -200,20 +229,18 @@ export default function HomePage() {
                 const isActive = activeHeroProduct === index;
                 return (
                   <div
-                    className={`absolute ${layout.wrapper} overflow-hidden rounded-[30px] border bg-black/35 transition-all duration-500 ease-out`}
+                    className={`absolute ${layout.wrapper} overflow-hidden rounded-[30px] transition-all duration-500 ease-out`}
                     key={product.title}
                     onMouseEnter={() => setActiveHeroProduct(index)}
                     style={{
                       zIndex: isActive ? 40 : layout.baseZIndex,
                       transform: `rotate(${layout.rotation}) scale(${isActive ? 1.045 : 1}) translateY(${isActive ? "-10px" : "0px"})`,
-                      borderColor: isActive ? "rgba(148,163,184,0.45)" : "rgba(203,213,225,0.9)",
                       boxShadow: isActive
-                        ? "0 35px 120px rgba(148,163,184,0.28), 0 0 0 1px rgba(255,255,255,0.7)"
+                        ? "0 35px 120px rgba(148,163,184,0.24)"
                         : "0 30px 90px rgba(148,163,184,0.24)",
                       filter: activeHeroProduct !== null && !isActive ? "brightness(0.78) saturate(0.9)" : "none",
                     }}
                   >
-                    <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(148,163,184,0.82),transparent)] opacity-0 transition duration-300" style={{ opacity: isActive ? 1 : 0 }} />
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       alt={product.title}
@@ -266,69 +293,61 @@ export default function HomePage() {
         </section>
 
         <section className="mx-auto w-full max-w-[1480px] px-6 py-8">
-          <div className="flex flex-col items-start justify-between gap-4 border-b border-[#dce3ed] pb-5 md:flex-row md:items-end">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">Core surfaces</p>
-              <h2 className="mt-2 text-4xl font-black tracking-[-0.04em] text-[#101828] md:text-5xl">
-                A cold, high-contrast interface for agentic commerce.
-              </h2>
-            </div>
-            <p className="max-w-xl text-sm leading-7 text-[#667085] md:text-right">
-              Recommendation, negotiation, and execution are presented as linked surfaces with low
-              visual noise and high operational density.
-            </p>
+          <div className="border-b border-[#dce3ed] pb-5">
+            <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">Core surfaces</p>
+            <h2 className="mt-2 max-w-4xl text-4xl font-black tracking-[-0.04em] text-[#101828] md:text-5xl">
+              A cleaner product story, presented as focused operational surfaces.
+            </h2>
           </div>
-          <div className="mt-6 grid gap-5 lg:grid-cols-3">
-            {capabilityCards.map((card, index) => (
-              <article
-                className="group relative overflow-hidden rounded-[32px] border border-[#dde3ec] bg-white/82 p-4 backdrop-blur-2xl transition duration-300 hover:border-[#c6d0dc] hover:bg-white hover:shadow-[0_20px_60px_rgba(148,163,184,0.14)]"
-                key={card.title}
-                style={{ animation: `fadeUp 0.7s ease ${index * 0.08}s both` }}
-              >
-                <div className="pointer-events-none absolute -bottom-20 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-indigo-500/0 blur-3xl transition duration-300 group-hover:bg-indigo-500/18" />
-                <div className="pointer-events-none absolute inset-x-16 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(148,163,184,0.6),transparent)] opacity-0 transition group-hover:opacity-100" />
-                <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">{card.eyebrow}</p>
-                <h3 className="mt-2 text-2xl font-black tracking-[-0.03em] text-[#101828]">{card.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-[#667085]">{card.copy}</p>
-                <div className="mt-5 overflow-hidden rounded-[24px] border border-[#dce3ed] bg-[#eef2f7]">
-                  <Image
-                    alt={card.title}
-                    className="h-auto w-full object-cover transition duration-500 group-hover:scale-[1.02]"
-                    height={760}
-                    src={card.image}
-                    width={1080}
-                  />
-                </div>
-              </article>
-            ))}
+          <div className="mt-8 space-y-8">
+            {capabilityCards.map((card, index) => {
+              const reverse = index % 2 === 1;
+              return (
+                <article
+                  className={`grid gap-8 rounded-[34px] border border-[#dde3ec] bg-[linear-gradient(180deg,#ffffff_0%,#f2f5f9_100%)] p-6 shadow-[0_22px_60px_rgba(148,163,184,0.1)] md:h-[620px] md:p-8 lg:grid-cols-[0.7fr_1.3fr] ${
+                    reverse ? "lg:[&>*:first-child]:order-2 lg:[&>*:last-child]:order-1" : ""
+                  }`}
+                  key={card.title}
+                  style={{ animation: `fadeUp 0.7s ease ${index * 0.08}s both` }}
+                >
+                  <div className="flex h-full flex-col justify-center px-2 md:px-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b97a8]">{card.eyebrow}</p>
+                    <h3 className="mt-4 text-3xl font-black tracking-[-0.04em] text-[#101828] md:text-4xl">{card.title}</h3>
+                    <p className="mt-4 max-w-xl text-lg leading-8 text-[#667085]">{card.copy}</p>
+                    <Link className="mt-8 inline-flex text-base font-semibold text-[#c26d22] transition hover:text-[#9a5318]" href={card.href}>
+                      {card.cta} →
+                    </Link>
+                  </div>
+                  <div className="flex h-full items-center justify-center overflow-hidden rounded-[28px] border border-[#dce3ed] bg-[#f6f8fb] shadow-[0_16px_40px_rgba(148,163,184,0.12)]">
+                    <Image
+                      alt={card.title}
+                      className="h-full w-full object-contain"
+                      height={760}
+                      src={card.image}
+                      width={1080}
+                    />
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-[1480px] px-6 py-14">
-          <div className="relative overflow-hidden rounded-[36px] border border-[#dce3ed] bg-[linear-gradient(180deg,#ffffff_0%,#eef2f7_100%)] px-6 py-10 backdrop-blur-2xl md:px-10">
-            <div className="pointer-events-none absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2 bg-[linear-gradient(90deg,transparent,rgba(96,165,250,0.62),transparent)]" />
-            <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">Final call</p>
-            <h2 className="mt-3 max-w-4xl text-4xl font-black tracking-[-0.04em] text-[#101828] md:text-6xl">
-              Stop browsing like a shopper. Start operating like a buying desk.
-            </h2>
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-[#667085]">
-              Move from vague product discovery to explicit procurement logic. Search, compare,
-              bargain, and order through a single AI-native surface.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link
-                className="inline-flex h-12 items-center rounded-2xl bg-white px-6 text-sm font-bold text-black transition hover:bg-white/90"
-                href="/chat"
-              >
-                Open the Console
-              </Link>
-              <button
-                className="inline-flex h-12 items-center rounded-2xl border border-[#d7dde7] bg-[#f7f9fc] px-6 text-sm font-semibold text-[#475467] backdrop-blur-xl transition hover:border-[#c4ccd8] hover:bg-white"
-                onClick={() => setAuthOpen(true)}
-                type="button"
-              >
-                Authenticate
-              </button>
+        <section className="mx-auto w-full max-w-[1480px] px-6 pb-16 pt-10">
+          <div className="rounded-[28px] bg-[linear-gradient(180deg,#f2f5f8_0%,#eceff4_100%)] px-5 py-10 md:px-8 lg:px-10">
+            <div className="grid gap-10 border-t border-[#d6dde7] pt-8 md:grid-cols-2 lg:grid-cols-5">
+              {footerColumns.map((column) => (
+                <div key={column.title}>
+                  <p className="text-sm font-semibold text-[#111827]">{column.title}</p>
+                  <div className="mt-5 space-y-3">
+                    {column.items.map((item) => (
+                      <p className="text-sm leading-6 text-[#667085]" key={item}>
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

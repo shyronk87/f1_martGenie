@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from datetime import timedelta
@@ -21,6 +22,7 @@ from src.web.auth.models import User
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -238,6 +240,8 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
         raise HTTPException(status_code=404, detail="Task not found for this session.")
 
     async def event_generator():
+        logger.info("chat.stream start session_id=%s task_id=%s", session_id, task_id)
+
         def add_timeline(event_type: str, message: str) -> str:
             event = {
                 "id": _new_id("evt"),
@@ -249,6 +253,7 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             return _sse({"type": "timeline_event", "event": event})
 
         try:
+            logger.info("chat.stream initial_yields session_id=%s task_id=%s", session_id, task_id)
             yield _sse({"type": "message_delta", "delta": "Analyzing your requirements... "})
             yield add_timeline("scan_started", "Started parsing requirements.")
 
@@ -257,11 +262,23 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 for m in session["messages"]
                 if m.get("role") in {"user", "assistant", "system"}
             ]
+            logger.info(
+                "chat.stream conversation_ready session_id=%s task_id=%s messages=%s",
+                session_id,
+                task_id,
+                len(conversation),
+            )
 
             long_term_memory: dict[str, Any] | None = None
             user_id_raw = str(session.get("user_id") or "").strip()
             if user_id_raw:
                 try:
+                    logger.info(
+                        "chat.stream loading_memory session_id=%s task_id=%s user_id=%s",
+                        session_id,
+                        task_id,
+                        user_id_raw,
+                    )
                     user_id = UUID(user_id_raw)
                     async with async_session_maker() as db_session:
                         profile_resp = await get_profile(db_session, user_id)
@@ -271,6 +288,11 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                             k: v for k, v in profile_payload.items() if v not in (None, "", [], {})
                         }
                 except Exception:
+                    logger.exception(
+                        "chat.stream memory_load_failed session_id=%s task_id=%s",
+                        session_id,
+                        task_id,
+                    )
                     long_term_memory = None
             if long_term_memory:
                 loaded_keys = list(long_term_memory.keys())
@@ -278,6 +300,13 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             else:
                 yield add_timeline("scan_progress", "No long-term memory loaded for current user.")
 
+            yield add_timeline("scan_progress", "Sending request to requirement-analysis model.")
+            logger.info(
+                "chat.stream analyze_start session_id=%s task_id=%s has_memory=%s",
+                session_id,
+                task_id,
+                bool(long_term_memory),
+            )
             try:
                 analysis, analysis_logs = await asyncio.wait_for(
                     analyze_user_content_with_debug(
@@ -291,11 +320,21 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 yield _sse({"type": "error", "error": "Analysis timeout. Please retry."})
                 yield _sse({"type": "done"})
                 return
+            logger.info(
+                "chat.stream analyze_done session_id=%s task_id=%s ready=%s missing=%s items=%s",
+                session_id,
+                task_id,
+                analysis.is_ready,
+                analysis.missing_fields,
+                len(analysis.target_items),
+            )
 
             for log in analysis_logs:
                 yield add_timeline("scan_progress", log)
 
             yield add_timeline("scan_progress", "Structured fields extracted.")
+            yield add_timeline("scan_progress", "Searching product catalog with extracted filters.")
+            logger.info("chat.stream query_start session_id=%s task_id=%s", session_id, task_id)
             try:
                 query_result = await asyncio.wait_for(
                     query_products_from_analysis(
@@ -310,6 +349,13 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 yield _sse({"type": "error", "error": "Query timeout. Please retry."})
                 yield _sse({"type": "done"})
                 return
+            logger.info(
+                "chat.stream query_done session_id=%s task_id=%s ready=%s products=%s",
+                session_id,
+                task_id,
+                query_result.is_ready,
+                len(query_result.products),
+            )
 
             for log in query_result.debug_logs:
                 yield add_timeline("scan_progress", log)
@@ -331,6 +377,13 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             yield add_timeline("candidate_found", f"Found {len(query_result.products)} matching products.")
 
             if query_result.products:
+                yield add_timeline("bundle_built", "Sending ranked candidates to bundle composer.")
+                logger.info(
+                    "chat.stream compose_start session_id=%s task_id=%s candidates=%s",
+                    session_id,
+                    task_id,
+                    len(query_result.products),
+                )
                 try:
                     ai_bundle, bundle_logs = await asyncio.wait_for(
                         compose_bundle_with_ai(
@@ -345,6 +398,12 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 except asyncio.TimeoutError:
                     yield add_timeline("bundle_built", "AI bundle composition timeout, fallback used.")
                     ai_bundle = None
+                logger.info(
+                    "chat.stream compose_done session_id=%s task_id=%s ai_bundle=%s",
+                    session_id,
+                    task_id,
+                    bool(ai_bundle and ai_bundle.options),
+                )
 
                 plans: list[dict[str, Any]] = []
                 target_labels = [t.category for t in analysis.target_items if t.category]
@@ -409,6 +468,12 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
 
                 plans = plans[:5]
                 session["plans"] = plans
+                logger.info(
+                    "chat.stream plans_ready session_id=%s task_id=%s plans=%s",
+                    session_id,
+                    task_id,
+                    len(plans),
+                )
                 yield add_timeline("bundle_built", f"Generated {len(plans)} bundle option(s).")
                 yield add_timeline("plan_ready", "Prepared order-ready recommendation popup.")
                 yield _sse({"type": "plan_ready", "plans": plans})
@@ -433,7 +498,14 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
             yield _sse({"type": "message", "message": assistant_message})
             yield add_timeline("done", "Query pipeline finished.")
             yield _sse({"type": "done"})
+            logger.info("chat.stream done session_id=%s task_id=%s", session_id, task_id)
         except Exception as exc:
+            logger.exception(
+                "chat.stream failed session_id=%s task_id=%s error=%s",
+                session_id,
+                task_id,
+                exc,
+            )
             yield add_timeline("error", f"Pipeline failed: {exc}")
             yield _sse({"type": "error", "error": f"Chat pipeline failed: {exc}"})
             yield _sse({"type": "done"})

@@ -5,14 +5,18 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import { createMockOrder, type MockOrderResponse, type PlanOption } from "@/lib/chat-api";
+import type { ChatMessage, TimelineEvent } from "@/lib/chat-contract";
 import { readNegotiatedDeals } from "@/lib/negotiation-store";
 import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
 type SavedWorkspaceState = {
   sessionId?: string | null;
+  messages?: ChatMessage[];
+  timeline?: TimelineEvent[];
   plans: PlanOption[];
   activePlanId: string | null;
+  status?: string;
   orderResult: MockOrderResponse | null;
 };
 
@@ -37,7 +41,14 @@ function writeSavedWorkspace(nextState: SavedWorkspaceState) {
     return;
   }
 
-  window.sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(nextState));
+  const current = readSavedWorkspace();
+  window.sessionStorage.setItem(
+    WORKSPACE_STORAGE_KEY,
+    JSON.stringify({
+      ...current,
+      ...nextState,
+    }),
+  );
 }
 
 export default function RecommendationsPage() {

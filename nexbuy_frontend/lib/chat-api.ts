@@ -13,8 +13,15 @@ type SendMessageResponse = { message_id: string; task_id: string; status: string
 
 const DEFAULT_CHAT_MODE = "mock";
 const chatMode = (process.env.NEXT_PUBLIC_CHAT_MODE ?? DEFAULT_CHAT_MODE).toLowerCase();
+const DEFAULT_STREAM_BACKEND_ORIGIN = "http://127.0.0.1:8000";
 
 type StreamHandler = (event: StreamEvent) => void;
+
+function getChatStreamBaseUrl() {
+  const configuredOrigin =
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN ?? DEFAULT_STREAM_BACKEND_ORIGIN;
+  return `${configuredOrigin.replace(/\/+$/, "")}/api`;
+}
 
 export async function createChatSession(): Promise<string> {
   if (chatMode === "real") {
@@ -68,11 +75,8 @@ export function subscribeChatStream(
 ): () => void {
   if (chatMode === "real") {
     const token = readAccessToken();
-    const path = `${getApiBaseUrl()}/chat/sessions/${sessionId}/stream`;
-    const url = new URL(
-      path,
-      typeof window !== "undefined" ? window.location.origin : "http://localhost:8001",
-    );
+    const path = `${getChatStreamBaseUrl()}/chat/sessions/${sessionId}/stream`;
+    const url = new URL(path);
     url.searchParams.set("task_id", taskId);
     if (token) {
       url.searchParams.set("access_token", token);

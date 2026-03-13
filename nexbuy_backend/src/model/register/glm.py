@@ -4,6 +4,8 @@ from typing import Any
 from .base import ChatMessage, ChatResult
 from ..config import model_settings
 
+GLM_REQUEST_TIMEOUT_SECONDS = 30
+
 
 class GLMClient:
     """SDK client for Zhipu GLM chat completions API."""
@@ -50,7 +52,15 @@ class GLMClient:
                 kwargs["max_tokens"] = max_tokens
             return self._sdk_client.chat.completions.create(**kwargs)
 
-        response = await asyncio.to_thread(_request)
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_request),
+                timeout=GLM_REQUEST_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"GLM chat request timed out after {GLM_REQUEST_TIMEOUT_SECONDS}s."
+            ) from exc
 
         if hasattr(response, "model_dump"):
             data = response.model_dump()  # pydantic model

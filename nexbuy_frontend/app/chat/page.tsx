@@ -126,6 +126,29 @@ function normalizeStatus(status: string) {
   return status === LEGACY_AI_STATUS ? AGENT_ANALYZING_STATUS : status;
 }
 
+function normalizeWorkspace(raw: SavedWorkspaceState | null) {
+  if (!raw) {
+    return null;
+  }
+
+  return {
+    sessionId: raw.sessionId ?? null,
+    messages: Array.isArray(raw.messages) ? raw.messages : [],
+    timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
+    plans: Array.isArray(raw.plans) ? raw.plans : [],
+    activePlanId: raw.activePlanId ?? null,
+    status: typeof raw.status === "string" ? raw.status : "Preparing workspace...",
+  } satisfies SavedWorkspaceState;
+}
+
+function clearSavedWorkspace() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(WORKSPACE_STORAGE_KEY);
+}
+
 
 export default function ChatWorkspacePage() {
   const router = useRouter();
@@ -161,7 +184,9 @@ export default function ChatWorkspacePage() {
 
     try {
       const raw = window.sessionStorage.getItem(WORKSPACE_STORAGE_KEY);
-      const restoredWorkspace = raw ? (JSON.parse(raw) as SavedWorkspaceState) : null;
+      const restoredWorkspace = normalizeWorkspace(
+        raw ? (JSON.parse(raw) as SavedWorkspaceState) : null,
+      );
 
       if (restoredWorkspace) {
         setSessionId(restoredWorkspace.sessionId);
@@ -179,7 +204,7 @@ export default function ChatWorkspacePage() {
         );
       }
     } catch {
-      window.sessionStorage.removeItem(WORKSPACE_STORAGE_KEY);
+      clearSavedWorkspace();
     } finally {
       setIsWorkspaceHydrated(true);
     }
@@ -249,11 +274,17 @@ export default function ChatWorkspacePage() {
           setShowOnboarding(true);
           setStatus("Please complete onboarding questions first.");
         } else {
-          if (restoredWorkspaceRef.current && sessionId) {
+          if (sessionId) {
             if (unmounted) {
               return;
             }
-            setStatus((current) => current || "Workspace restored.");
+            setStatus((current) =>
+              current && current !== "Preparing workspace..."
+                ? current
+                : restoredWorkspaceRef.current
+                  ? "Workspace restored."
+                  : "Workspace ready. Tell me your room, style, and budget.",
+            );
             return;
           }
           const createdSessionId = await createChatSession();
@@ -384,6 +415,20 @@ export default function ChatWorkspacePage() {
       });
     } catch (sendError) {
       const message = sendError instanceof Error ? sendError.message : "Could not send message.";
+      if (message.includes("Chat session not found")) {
+        clearSavedWorkspace();
+        setSessionId(null);
+        setMessages([]);
+        setTimeline([]);
+        setPlans([]);
+        setActivePlanId(null);
+        setPrompt(content);
+        setError("Your previous chat expired after the backend restarted. A new workspace is being prepared.");
+        setStatus("Preparing a new workspace...");
+        setIsSending(false);
+        setBootstrapNonce((current) => current + 1);
+        return;
+      }
       setError(message);
       setStatus("Request failed.");
       setIsSending(false);
@@ -484,6 +529,7 @@ export default function ChatWorkspacePage() {
         isAuthenticated={isAuthenticated}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
+          clearSavedWorkspace();
           clearAccessToken();
           setIsAuthenticated(false);
           router.push("/");

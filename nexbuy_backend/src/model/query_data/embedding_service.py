@@ -3,6 +3,8 @@ from typing import Any
 
 from src.model.config import model_settings
 
+EMBEDDING_REQUEST_TIMEOUT_SECONDS = 15
+
 
 class EmbeddingService:
     def __init__(
@@ -47,7 +49,15 @@ class EmbeddingService:
                 input=cleaned,
             )
 
-        response = await asyncio.to_thread(_request)
+        try:
+            response = await asyncio.wait_for(
+                asyncio.to_thread(_request),
+                timeout=EMBEDDING_REQUEST_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"Embedding request timed out after {EMBEDDING_REQUEST_TIMEOUT_SECONDS}s."
+            ) from exc
         payload = response.model_dump() if hasattr(response, "model_dump") else response
         if not isinstance(payload, dict):
             raise RuntimeError(f"Unexpected embedding response: {payload}")

@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
-import type { MockOrderResponse, PlanOption } from "@/lib/chat-contract";
+import { createMockOrder, type MockOrderResponse, type PlanOption } from "@/lib/chat-api";
 import { readNegotiatedDeals } from "@/lib/negotiation-store";
 import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
 type SavedWorkspaceState = {
+  sessionId?: string | null;
   plans: PlanOption[];
   activePlanId: string | null;
   orderResult: MockOrderResponse | null;
@@ -31,6 +32,14 @@ function readSavedWorkspace(): SavedWorkspaceState | null {
   }
 }
 
+function writeSavedWorkspace(nextState: SavedWorkspaceState) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(nextState));
+}
+
 export default function RecommendationsPage() {
   const router = useRouter();
   const initialWorkspace = readSavedWorkspace();
@@ -40,7 +49,9 @@ export default function RecommendationsPage() {
   const [activePlanId, setActivePlanId] = useState<string | null>(
     initialWorkspace?.activePlanId ?? initialWorkspace?.plans?.[0]?.id ?? null,
   );
-  const [orderResult] = useState<MockOrderResponse | null>(initialWorkspace?.orderResult ?? null);
+  const [orderResult, setOrderResult] = useState<MockOrderResponse | null>(initialWorkspace?.orderResult ?? null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const token = readAccessToken();
@@ -52,6 +63,19 @@ export default function RecommendationsPage() {
       .then(() => setIsAuthenticated(true))
       .catch(() => setIsAuthenticated(false));
   }, []);
+
+  useEffect(() => {
+    if (!initialWorkspace) {
+      return;
+    }
+
+    writeSavedWorkspace({
+      sessionId: initialWorkspace.sessionId ?? null,
+      plans,
+      activePlanId,
+      orderResult,
+    });
+  }, [activePlanId, initialWorkspace, orderResult, plans]);
 
   const negotiatedDeals = readNegotiatedDeals();
   const displayedPlans = useMemo(
@@ -68,6 +92,50 @@ export default function RecommendationsPage() {
 
   const activePlan =
     displayedPlans.find((plan) => plan.id === activePlanId) ?? displayedPlans[0] ?? null;
+  const activePlanSavings = activePlan
+    ? activePlan.items.reduce((sum, item) => {
+        const deal = negotiatedDeals[item.sku];
+        return sum + (deal ? Math.max(0, deal.originalPrice - deal.negotiatedPrice) : 0);
+      }, 0)
+    : 0;
+  const activePlanNegotiatedCount = activePlan
+    ? activePlan.items.filter((item) => Boolean(negotiatedDeals[item.sku])).length
+    : 0;
+
+  async function handleConfirmOrder() {
+    if (!activePlan || !initialWorkspace?.plans || !initialWorkspace?.sessionId) {
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    setError("");
+
+    try {
+      const result = await createMockOrder({
+        sessionId: initialWorkspace.sessionId,
+        planId: activePlan.id,
+        items: activePlan.items.map((item) => ({
+          sku: item.sku,
+          title: item.title,
+          price: item.price,
+          quantity: 1,
+        })),
+        paymentMethod: "card",
+        shippingAddress: "Mock address",
+      });
+      setOrderResult(result);
+      writeSavedWorkspace({
+        sessionId: initialWorkspace.sessionId,
+        plans,
+        activePlanId: activePlan.id,
+        orderResult: result,
+      });
+    } catch (placeError) {
+      setError(placeError instanceof Error ? placeError.message : "Could not place this mock order.");
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-[#101828]">
@@ -97,6 +165,19 @@ export default function RecommendationsPage() {
                 <p className="mt-3 max-w-3xl text-base leading-7 text-[#667085]">
                   Review the packages Nexbuy assembled, inspect item-level reasoning, and jump into negotiation when you want to push pricing further.
                 </p>
+                {activePlan ? (
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <span className="rounded-full border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2 text-sm font-semibold text-[#344054]">
+                      {activePlan.items.length} items in this package
+                    </span>
+                    <span className="rounded-full border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2 text-sm font-semibold text-[#344054]">
+                      {activePlanNegotiatedCount} negotiated items
+                    </span>
+                    <span className="rounded-full border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2 text-sm font-semibold text-[#344054]">
+                      Saved ${activePlanSavings.toLocaleString()}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <Link
                 className="inline-flex h-[52px] items-center justify-center rounded-2xl border border-[#d3dae5] bg-[linear-gradient(180deg,#ffffff_0%,#eef2f7_100%)] px-5 text-sm font-semibold text-[#101828] transition hover:border-[#c5cfdb] hover:bg-white"
@@ -168,12 +249,23 @@ export default function RecommendationsPage() {
                             {activePlan.explanation ?? activePlan.summary}
                           </p>
                         </div>
-                        {orderResult ? (
-                          <span className="rounded-full bg-[#ecfdf3] px-3 py-1 text-xs font-semibold text-[#15803d]">
-                            Order placed: {orderResult.order_id}
-                          </span>
-                        ) : null}
+                        <div className="flex flex-wrap items-center gap-3">
+                          {orderResult ? (
+                            <span className="rounded-full bg-[#ecfdf3] px-3 py-1 text-xs font-semibold text-[#15803d]">
+                              Order placed: {orderResult.order_id}
+                            </span>
+                          ) : null}
+                          <button
+                            className="inline-flex h-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={isPlacingOrder}
+                            onClick={handleConfirmOrder}
+                            type="button"
+                          >
+                            {isPlacingOrder ? "Placing order..." : "Place mock order"}
+                          </button>
+                        </div>
                       </div>
+                      {error ? <p className="mt-4 text-sm text-[#b42318]">{error}</p> : null}
 
                       <div className="mt-5 grid gap-4 md:grid-cols-2">
                         {activePlan.items.map((item) => (

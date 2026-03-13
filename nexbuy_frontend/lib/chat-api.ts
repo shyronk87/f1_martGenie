@@ -68,7 +68,11 @@ export function subscribeChatStream(
 ): () => void {
   if (chatMode === "real") {
     const token = readAccessToken();
-    const url = new URL(`${getApiBaseUrl()}/chat/sessions/${sessionId}/stream`);
+    const path = `${getApiBaseUrl()}/chat/sessions/${sessionId}/stream`;
+    const url = new URL(
+      path,
+      typeof window !== "undefined" ? window.location.origin : "http://localhost:8001",
+    );
     url.searchParams.set("task_id", taskId);
     if (token) {
       url.searchParams.set("access_token", token);

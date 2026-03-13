@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
-  createMockOrder,
   createChatSession,
   type ChatMessage,
-  type MockOrderResponse,
   type PlanOption,
   sendChatMessage,
   subscribeChatStream,
@@ -20,31 +18,12 @@ import {
   saveMemoryProfile,
   type OnboardingQuestion,
 } from "@/lib/memory-api";
-import { streamBuyerAgentNegotiation, type BuyerAgentRunResult, type BuyerAgentStreamEvent } from "@/lib/negotiation-api";
-import {
-  readNegotiatedDeals,
-  readNegotiationRuns,
-  writeNegotiatedDeal,
-  writeNegotiationRun,
-  type NegotiatedDeal,
-} from "@/lib/negotiation-store";
 import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
 type FriendlyEvent = {
   title: string;
   detail: string;
-};
-
-type InlineNegotiationState = {
-  sku: string;
-  targetPrice: string;
-  maxAcceptablePrice: string;
-  isRunning: boolean;
-  progressPercent: number;
-  progressLabel: string;
-  error: string;
-  result: BuyerAgentRunResult | null;
 };
 
 type SavedWorkspaceState = {
@@ -54,9 +33,6 @@ type SavedWorkspaceState = {
   plans: PlanOption[];
   activePlanId: string | null;
   status: string;
-  orderResult: MockOrderResponse | null;
-  inlineNegotiations: Record<string, InlineNegotiationState>;
-  expandedNegotiationSku: string | null;
 };
 
 const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
@@ -153,19 +129,13 @@ export default function ChatWorkspacePage() {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [plans, setPlans] = useState<PlanOption[]>([]);
   const [activePlanId, setActivePlanId] = useState<string | null>(null);
-  const [showOrderConfirm, setShowOrderConfirm] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [orderResult, setOrderResult] = useState<MockOrderResponse | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingQuestions, setOnboardingQuestions] = useState<OnboardingQuestion[]>([]);
   const [onboardingAnswers, setOnboardingAnswers] = useState<Record<string, string | string[]>>({});
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
   const [bootstrapNonce, setBootstrapNonce] = useState(0);
-  const [negotiatedDeals, setNegotiatedDeals] = useState<Record<string, NegotiatedDeal>>({});
-  const [inlineNegotiations, setInlineNegotiations] = useState<Record<string, InlineNegotiationState>>({});
-  const [expandedNegotiationSku, setExpandedNegotiationSku] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState("Preparing workspace...");
   const [error, setError] = useState("");
@@ -194,11 +164,13 @@ export default function ChatWorkspacePage() {
         setPlans(restoredWorkspace.plans);
         setActivePlanId(restoredWorkspace.activePlanId);
         setStatus(restoredWorkspace.status);
-        setOrderResult(restoredWorkspace.orderResult);
-        setInlineNegotiations(restoredWorkspace.inlineNegotiations);
-        setExpandedNegotiationSku(restoredWorkspace.expandedNegotiationSku);
         plansRef.current = restoredWorkspace.plans;
-        restoredWorkspaceRef.current = true;
+        restoredWorkspaceRef.current = Boolean(
+          restoredWorkspace.sessionId ||
+            restoredWorkspace.messages.length ||
+            restoredWorkspace.timeline.length ||
+            restoredWorkspace.plans.length,
+        );
       }
     } catch {
       window.sessionStorage.removeItem(WORKSPACE_STORAGE_KEY);
@@ -219,13 +191,10 @@ export default function ChatWorkspacePage() {
       plans,
       activePlanId,
       status,
-      orderResult,
-      inlineNegotiations,
-      expandedNegotiationSku,
     };
 
     window.sessionStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(payload));
-  }, [activePlanId, expandedNegotiationSku, inlineNegotiations, isWorkspaceHydrated, messages, orderResult, plans, sessionId, status, timeline]);
+  }, [activePlanId, isWorkspaceHydrated, messages, plans, sessionId, status, timeline]);
 
   useEffect(() => {
     if (!isSending) {
@@ -244,21 +213,6 @@ export default function ChatWorkspacePage() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [isSending]);
-
-  useEffect(() => {
-    function syncNegotiatedDeals() {
-      setNegotiatedDeals(readNegotiatedDeals());
-    }
-
-    syncNegotiatedDeals();
-    window.addEventListener("focus", syncNegotiatedDeals);
-    window.addEventListener("storage", syncNegotiatedDeals);
-
-    return () => {
-      window.removeEventListener("focus", syncNegotiatedDeals);
-      window.removeEventListener("storage", syncNegotiatedDeals);
-    };
-  }, []);
 
   useEffect(() => {
     if (!isWorkspaceHydrated) {
@@ -289,7 +243,7 @@ export default function ChatWorkspacePage() {
           setShowOnboarding(true);
           setStatus("Please complete onboarding questions first.");
         } else {
-          if (restoredWorkspaceRef.current) {
+          if (restoredWorkspaceRef.current && sessionId) {
             if (unmounted) {
               return;
             }
@@ -321,7 +275,7 @@ export default function ChatWorkspacePage() {
       unmounted = true;
       unsubscribeRef.current?.();
     };
-  }, [bootstrapNonce, isWorkspaceHydrated]);
+  }, [bootstrapNonce, isWorkspaceHydrated, sessionId]);
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -448,259 +402,6 @@ export default function ChatWorkspacePage() {
     ]);
   }
 
-  async function handleConfirmOrder() {
-    if (!sessionId || !activePlan) {
-      return;
-    }
-    setIsPlacingOrder(true);
-    setError("");
-    try {
-      const result = await createMockOrder({
-        sessionId,
-        planId: activePlan.id,
-        items: activePlan.items.map((item) => ({
-          sku: item.sku,
-          title: item.title,
-          price: item.price,
-          quantity: 1,
-        })),
-        paymentMethod: "card",
-        shippingAddress: "Mock address",
-      });
-      setOrderResult(result);
-      setShowOrderConfirm(false);
-      setStatus("Order placed (mock).");
-    } catch (placeError) {
-      const message = placeError instanceof Error ? placeError.message : "Failed to place order.";
-      setError(message);
-    } finally {
-      setIsPlacingOrder(false);
-    }
-  }
-
-  function handleOpenNegotiation() {
-    if (!activePlan || activePlan.items.length === 0) {
-      return;
-    }
-
-    const primaryItem = activePlan.items[0];
-    ensureInlineNegotiationState(activePlan, primaryItem);
-  }
-
-  function handleOpenItemNegotiation(plan: PlanOption, item: PlanOption["items"][number]) {
-    ensureInlineNegotiationState(plan, item);
-  }
-
-  function handleViewNegotiation(plan: PlanOption, item: PlanOption["items"][number]) {
-    router.push(`/negotiation?${buildNegotiationQuery(plan, item).toString()}`);
-  }
-
-  async function handleRunInlineNegotiation(plan: PlanOption, item: PlanOption["items"][number]) {
-    const current = inlineNegotiations[item.sku];
-    const parsedTarget = Number(current?.targetPrice);
-    const parsedMax = Number(current?.maxAcceptablePrice);
-
-    if (
-      !Number.isFinite(parsedTarget) ||
-      !Number.isFinite(parsedMax) ||
-      parsedTarget <= 0 ||
-      parsedMax <= 0 ||
-      parsedMax < parsedTarget ||
-      current?.isRunning
-    ) {
-      upsertInlineNegotiation(item.sku, (previous) => ({
-        sku: item.sku,
-        targetPrice: previous?.targetPrice ?? "",
-        maxAcceptablePrice: previous?.maxAcceptablePrice ?? "",
-        isRunning: false,
-        progressPercent: previous?.progressPercent ?? 0,
-        progressLabel: previous?.progressLabel ?? "Set your target and max acceptable prices.",
-        error: "Enter valid target and max acceptable prices first.",
-        result: previous?.result ?? null,
-      }));
-      return;
-    }
-
-    upsertInlineNegotiation(item.sku, (previous) => ({
-      sku: item.sku,
-      targetPrice: previous?.targetPrice ?? String(parsedTarget),
-      maxAcceptablePrice: previous?.maxAcceptablePrice ?? String(parsedMax),
-      isRunning: true,
-      progressPercent: 4,
-      progressLabel: "Connecting buyer agent to the seller session...",
-      error: "",
-      result: null,
-    }));
-
-    writeNegotiationRun({
-      sku: item.sku,
-      title: item.title,
-      originalPrice: negotiatedDeals[item.sku]?.originalPrice ?? item.price,
-      planId: plan.id,
-      planTitle: plan.title,
-      targetPrice: parsedTarget,
-      maxAcceptablePrice: parsedMax,
-      status: "running",
-      progressLabel: "Connecting buyer agent to the seller session...",
-      progressPercent: 4,
-      turns: [],
-      sellerSession: null,
-      result: null,
-      savedAt: new Date().toISOString(),
-    });
-
-    try {
-      await streamBuyerAgentNegotiation(
-        {
-          skuIdDefault: item.sku,
-          targetPrice: parsedTarget,
-          maxAcceptablePrice: parsedMax,
-        },
-        (event) => {
-          const progress = buildProgressFromEvent(event);
-          const storedRun = readNegotiationRuns()[item.sku];
-          if (progress) {
-            upsertInlineNegotiation(item.sku, (previous) => ({
-              sku: item.sku,
-              targetPrice: previous?.targetPrice ?? String(parsedTarget),
-              maxAcceptablePrice: previous?.maxAcceptablePrice ?? String(parsedMax),
-              isRunning: event.type !== "done" && event.type !== "error",
-              progressPercent: progress.percent,
-              progressLabel: progress.label,
-              error: event.type === "error" ? event.error : "",
-              result: event.type === "done" ? event.result : previous?.result ?? null,
-            }));
-          }
-
-          if (event.type === "session_started") {
-            writeNegotiationRun({
-              sku: item.sku,
-              title: item.title,
-              originalPrice: negotiatedDeals[item.sku]?.originalPrice ?? item.price,
-              planId: plan.id,
-              planTitle: plan.title,
-              targetPrice: parsedTarget,
-              maxAcceptablePrice: parsedMax,
-              status: "running",
-              progressLabel: progress?.label ?? "Seller session opened.",
-              progressPercent: progress?.percent ?? 8,
-              turns: storedRun?.turns ?? [],
-              sellerSession: event.seller_session,
-              result: null,
-              savedAt: new Date().toISOString(),
-            });
-          }
-
-          if (event.type === "buyer_turn") {
-            writeNegotiationRun({
-              sku: item.sku,
-              title: item.title,
-              originalPrice: negotiatedDeals[item.sku]?.originalPrice ?? item.price,
-              planId: plan.id,
-              planTitle: plan.title,
-              targetPrice: parsedTarget,
-              maxAcceptablePrice: parsedMax,
-              status: "running",
-              progressLabel: progress?.label ?? `Round ${event.turn.round_index}: buyer offer sent.`,
-              progressPercent: progress?.percent ?? 0,
-              turns: [...(storedRun?.turns ?? []).filter((turn) => turn.round_index !== event.turn.round_index), event.turn].sort(
-                (a, b) => a.round_index - b.round_index,
-              ),
-              sellerSession: storedRun?.sellerSession ?? null,
-              result: null,
-              savedAt: new Date().toISOString(),
-            });
-          }
-
-          if (event.type === "seller_turn") {
-            const existingTurns = storedRun?.turns ?? [];
-            const nextTurns = existingTurns.map((turn) =>
-              turn.round_index === event.turn.round_index ? { ...turn, seller_turn: event.turn } : turn,
-            );
-            writeNegotiationRun({
-              sku: item.sku,
-              title: item.title,
-              originalPrice: negotiatedDeals[item.sku]?.originalPrice ?? item.price,
-              planId: plan.id,
-              planTitle: plan.title,
-              targetPrice: parsedTarget,
-              maxAcceptablePrice: parsedMax,
-              status: "running",
-              progressLabel: progress?.label ?? `Round ${event.turn.round_index}: seller response received.`,
-              progressPercent: progress?.percent ?? 0,
-              turns: nextTurns,
-              sellerSession: storedRun?.sellerSession ?? null,
-              result: null,
-              savedAt: new Date().toISOString(),
-            });
-          }
-
-          if (event.type === "done") {
-            writeNegotiationRun({
-              sku: item.sku,
-              title: item.title,
-              originalPrice: negotiatedDeals[item.sku]?.originalPrice ?? item.price,
-              planId: plan.id,
-              planTitle: plan.title,
-              targetPrice: parsedTarget,
-              maxAcceptablePrice: parsedMax,
-              status: "done",
-              progressLabel: event.result.summary,
-              progressPercent: 100,
-              turns: event.result.turns,
-              sellerSession: event.result.seller_session,
-              result: event.result,
-              savedAt: new Date().toISOString(),
-            });
-
-            if (event.result.outcome === "accepted" && typeof event.result.final_price === "number") {
-              const deal = {
-                sku: item.sku,
-                title: item.title,
-                originalPrice: negotiatedDeals[item.sku]?.originalPrice ?? item.price,
-                negotiatedPrice: event.result.final_price,
-                planId: plan.id,
-                planTitle: plan.title,
-                acceptedAt: new Date().toISOString(),
-              };
-              writeNegotiatedDeal(deal);
-              setNegotiatedDeals((previous) => ({ ...previous, [item.sku]: deal }));
-            }
-          }
-        },
-      );
-    } catch (runError) {
-      const message = runError instanceof Error ? runError.message : "Could not run buyer agent negotiation.";
-      const previousRun = readNegotiationRuns()[item.sku];
-      writeNegotiationRun({
-        sku: item.sku,
-        title: item.title,
-        originalPrice: negotiatedDeals[item.sku]?.originalPrice ?? item.price,
-        planId: plan.id,
-        planTitle: plan.title,
-        targetPrice: parsedTarget,
-        maxAcceptablePrice: parsedMax,
-        status: "running",
-        progressLabel: "Negotiation failed.",
-        progressPercent: previousRun?.progressPercent ?? 0,
-        turns: previousRun?.turns ?? [],
-        sellerSession: previousRun?.sellerSession ?? null,
-        result: previousRun?.result ?? null,
-        savedAt: new Date().toISOString(),
-      });
-      upsertInlineNegotiation(item.sku, (previous) => ({
-        sku: item.sku,
-        targetPrice: previous?.targetPrice ?? String(parsedTarget),
-        maxAcceptablePrice: previous?.maxAcceptablePrice ?? String(parsedMax),
-        isRunning: false,
-        progressPercent: previous?.progressPercent ?? 0,
-        progressLabel: "Negotiation failed.",
-        error: message,
-        result: previous?.result ?? null,
-      }));
-    }
-  }
-
   function setOnboardingMultiValue(questionKey: string, value: string, checked: boolean) {
     setOnboardingAnswers((current) => {
       const prev = current[questionKey];
@@ -758,143 +459,17 @@ export default function ChatWorkspacePage() {
     }
   }
 
-  const renderedMessages = streamText
+  const renderedMessages = isSending
     ? [
         ...messages,
         {
           id: "assistant-draft",
           role: "assistant" as const,
-          content: streamText,
+          content: streamText || "AI is analyzing your request...",
           createdAt: new Date().toISOString(),
         },
       ]
     : messages;
-
-  const displayedPlans = plans.map((plan) => {
-    const items = plan.items.map((item) => {
-      const deal = negotiatedDeals[item.sku];
-      if (!deal) {
-        return item;
-      }
-
-      return {
-        ...item,
-        price: deal.negotiatedPrice,
-      };
-    });
-    const totalPrice = items.reduce((sum, item) => sum + item.price, 0);
-
-    return {
-      ...plan,
-      items,
-      totalPrice,
-    };
-  });
-  const activePlan =
-    displayedPlans.find((plan) => plan.id === activePlanId) ??
-    (displayedPlans.length > 0 ? displayedPlans[0] : null);
-  const activePlanSavings = activePlan
-    ? activePlan.items.reduce((sum, item) => {
-        const deal = negotiatedDeals[item.sku];
-        return sum + (deal ? Math.max(0, deal.originalPrice - deal.negotiatedPrice) : 0);
-      }, 0)
-    : 0;
-  const activePlanNegotiatedCount = activePlan
-    ? activePlan.items.filter((item) => Boolean(negotiatedDeals[item.sku])).length
-    : 0;
-
-  function buildNegotiationQuery(plan: PlanOption, item: PlanOption["items"][number]) {
-    return new URLSearchParams({
-      sku: item.sku,
-      title: item.title,
-      price: String(item.price),
-      planId: plan.id,
-      planTitle: plan.title,
-    });
-  }
-
-  function upsertInlineNegotiation(
-    sku: string,
-    updater: (current: InlineNegotiationState | undefined) => InlineNegotiationState,
-  ) {
-    setInlineNegotiations((current) => ({
-      ...current,
-      [sku]: updater(current[sku]),
-    }));
-  }
-
-  function getDefaultTargetPrice(price: number) {
-    return String(Math.round(price * 0.9));
-  }
-
-  function getDefaultMaxAcceptablePrice(price: number) {
-    return String(Math.round(price * 0.95));
-  }
-
-  function ensureInlineNegotiationState(plan: PlanOption, item: PlanOption["items"][number]) {
-    const storedRun = readNegotiationRuns()[item.sku];
-    setExpandedNegotiationSku(item.sku);
-    upsertInlineNegotiation(item.sku, (current) => ({
-      sku: item.sku,
-      targetPrice: current?.targetPrice ?? (storedRun ? String(storedRun.targetPrice) : getDefaultTargetPrice(item.price)),
-      maxAcceptablePrice:
-        current?.maxAcceptablePrice ?? (storedRun ? String(storedRun.maxAcceptablePrice) : getDefaultMaxAcceptablePrice(item.price)),
-      isRunning: current?.isRunning ?? false,
-      progressPercent: current?.progressPercent ?? storedRun?.progressPercent ?? 0,
-      progressLabel: current?.progressLabel ?? storedRun?.progressLabel ?? "Set your target and max acceptable prices.",
-      error: current?.error ?? "",
-      result: current?.result ?? storedRun?.result ?? null,
-    }));
-  }
-
-  function setInlineField(sku: string, field: "targetPrice" | "maxAcceptablePrice", value: string) {
-    upsertInlineNegotiation(sku, (current) => ({
-      sku,
-      targetPrice: field === "targetPrice" ? value : current?.targetPrice ?? "",
-      maxAcceptablePrice: field === "maxAcceptablePrice" ? value : current?.maxAcceptablePrice ?? "",
-      isRunning: current?.isRunning ?? false,
-      progressPercent: current?.progressPercent ?? 0,
-      progressLabel: current?.progressLabel ?? "Set your target and max acceptable prices.",
-      error: current?.error ?? "",
-      result: current?.result ?? null,
-    }));
-  }
-
-  function buildProgressFromEvent(event: BuyerAgentStreamEvent): { percent: number; label: string } | null {
-    if (event.type === "session_started") {
-      return { percent: 8, label: "Seller session opened. Buyer agent is preparing the first move." };
-    }
-
-    if (event.type === "thinking") {
-      const base = ((event.round_index - 1) * 2) / 10;
-      const percent = Math.min(94, Math.round((base + (event.phase === "buyer_decision" ? 0.35 : 0.7)) * 100));
-      return { percent, label: event.message };
-    }
-
-    if (event.type === "buyer_turn") {
-      return {
-        percent: Math.min(94, Math.round((((event.turn.round_index - 1) * 2 + 1) / 10) * 100)),
-        label: `Round ${event.turn.round_index}: buyer offer sent.`,
-      };
-    }
-
-    if (event.type === "seller_turn") {
-      return {
-        percent: Math.min(96, Math.round((((event.turn.round_index - 1) * 2 + 2) / 10) * 100)),
-        label: `Round ${event.turn.round_index}: seller response received.`,
-      };
-    }
-
-    if (event.type === "done") {
-      return { percent: 100, label: event.result.summary };
-    }
-
-    if (event.type === "error") {
-      return { percent: 100, label: "Negotiation failed." };
-    }
-
-    return null;
-  }
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] px-4 pb-5 pt-24 text-[#101828] md:px-6">

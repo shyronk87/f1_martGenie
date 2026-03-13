@@ -123,23 +123,23 @@ def _build_human_fallback_message(session: NegotiationSession, turn: Negotiation
 
     if turn.seller_decision == "need_offer":
         return (
-            f"I can help with {product_title}, but I need a concrete number from you first. "
-            "Share your best offer and I will review what I can do."
+            f"I'd be glad to work on {product_title}, but I need a real number from you first. "
+            "Send me your best offer and I'll see how close I can get."
         )
     if turn.seller_decision == "accept":
         return (
             f"That works on our side for {product_title}. "
-            f"We can confirm the deal at ${counter_price:.2f} and move straight to the next step."
+            f"We can do ${counter_price:.2f}, and if you're ready, we can wrap it up from here."
         )
     if turn.seller_decision == "counter":
         buyer_part = (
-            f"I see your offer at ${buyer_offer:.2f}, and you're close enough for a real discussion. "
+            f"I see your offer at ${buyer_offer:.2f}, and we're not far off. "
             if buyer_offer is not None
             else ""
         )
         return (
-            f"{buyer_part}I can't approve that level yet, but I can bring {product_title} to "
-            f"${counter_price:.2f}. That's a fair move from our side if you're ready to proceed."
+            f"{buyer_part}I can't do that number yet, but I can bring {product_title} to "
+            f"${counter_price:.2f}. That's a solid move from our side if you're ready to buy."
         )
     if turn.seller_decision == "reject":
         buyer_part = (
@@ -148,12 +148,12 @@ def _build_human_fallback_message(session: NegotiationSession, turn: Negotiation
             else ""
         )
         return (
-            f"{buyer_part}but that is below what we can accept for {product_title}. "
-            f"If you want to keep this moving, we would need to stay closer to ${min_expected:.2f}."
+            f"{buyer_part}but that's lower than we can go on {product_title}. "
+            f"If you want to keep this moving, we'd need to stay closer to ${min_expected:.2f}."
         )
     return (
         f"This negotiation for {product_title} is already closed. "
-        "If you want to revisit pricing, start a new negotiation round."
+        "If you want to revisit the price, just start a new round."
     )
 
 

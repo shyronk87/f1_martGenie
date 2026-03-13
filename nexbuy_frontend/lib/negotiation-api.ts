@@ -1,5 +1,13 @@
 import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
 
+const DEFAULT_STREAM_BACKEND_ORIGIN = "http://127.0.0.1:8000";
+
+function getNegotiationStreamBaseUrl() {
+  const configuredOrigin =
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN ?? DEFAULT_STREAM_BACKEND_ORIGIN;
+  return `${configuredOrigin.replace(/\/+$/, "")}/api`;
+}
+
 export type NegotiationProduct = {
   sku_id_default: string;
   title: string;
@@ -180,7 +188,20 @@ export type BuyerAgentStreamEvent =
   | { type: "buyer_turn"; turn: BuyerAgentTurn }
   | { type: "seller_turn"; turn: NegotiationTurn }
   | { type: "done"; result: BuyerAgentRunResult }
-  | { type: "error"; error: string };
+  | { type: "error"; error: string; run_id?: string };
+
+export async function cancelBuyerAgentNegotiation(runId: string): Promise<{
+  run_id: string;
+  cancelled: boolean;
+  message: string;
+}> {
+  const response = await fetch(`${getApiBaseUrl()}/agent-negotiation/run/${runId}/cancel`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+  });
+
+  return parseJsonResponse(response, "Could not cancel buyer agent negotiation.");
+}
 
 export async function streamBuyerAgentNegotiation(
   payload: {
@@ -189,13 +210,15 @@ export async function streamBuyerAgentNegotiation(
     maxAcceptablePrice: number;
   },
   onEvent: (event: BuyerAgentStreamEvent) => void,
+  options?: { signal?: AbortSignal },
 ): Promise<void> {
-  const response = await fetch(`${getApiBaseUrl()}/agent-negotiation/run/stream`, {
+  const response = await fetch(`${getNegotiationStreamBaseUrl()}/agent-negotiation/run/stream`, {
     method: "POST",
     headers: {
       ...buildAuthHeaders(),
       "Content-Type": "application/json",
     },
+    signal: options?.signal,
     body: JSON.stringify({
       sku_id_default: payload.skuIdDefault,
       target_price: payload.targetPrice,

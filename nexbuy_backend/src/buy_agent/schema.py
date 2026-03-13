@@ -55,3 +55,9 @@ class BuyerAgentRunResult(BaseModel):
     seller_session: NegotiationSession
     turns: list[BuyerAgentTurn] = Field(default_factory=list)
     created_at: str = Field(default_factory=now_iso)
+
+
+class BuyerAgentCancelResponse(BaseModel):
+    run_id: str
+    cancelled: bool
+    message: str

@@ -16,33 +16,61 @@ from .policy import (
 )
 from .schema import BuyerAgentRunResult, BuyerAgentTurn, BuyerOutcome
 
+_RUN_CANCEL_FLAGS: dict[str, bool] = {}
+
 
 def _new_run_id() -> str:
     return f"buyer_run_{uuid4().hex}"
 
 
+class BuyerAgentRunCancelled(Exception):
+    def __init__(self, run_id: str):
+        super().__init__("Buyer agent negotiation cancelled.")
+        self.run_id = run_id
+
+
+def cancel_buyer_run(run_id: str) -> bool:
+    if run_id not in _RUN_CANCEL_FLAGS:
+        return False
+    _RUN_CANCEL_FLAGS[run_id] = True
+    return True
+
+
+def _register_run(run_id: str) -> None:
+    _RUN_CANCEL_FLAGS[run_id] = False
+
+
+def _clear_run(run_id: str) -> None:
+    _RUN_CANCEL_FLAGS.pop(run_id, None)
+
+
+def _ensure_run_active(run_id: str) -> None:
+    if _RUN_CANCEL_FLAGS.get(run_id):
+        raise BuyerAgentRunCancelled(run_id)
+
+
 def _build_buyer_message(action: BuyerDecision, *, round_index: int) -> str:
     if action.action == "walk_away":
         return (
-            "I appreciate the discussion, but I can't justify going higher on this item right now. "
-            "I'll pause here unless there's better flexibility."
+            "Thanks for working with me, but I can't make the numbers work on my side right now. "
+            "I'll hold off for now unless there's a little more room."
         )
 
     if action.action == "accept_seller_price":
         assert action.buyer_offer is not None
         return (
-            f"That works for me. If you can confirm ${action.buyer_offer:.2f}, I'm ready to move forward."
+            f"That works for me. If you can do ${action.buyer_offer:.2f}, I'm happy to move ahead."
         )
 
     assert action.buyer_offer is not None
     if round_index == 1:
         return (
-            f"I'm interested in moving ahead, but I need a better number to make this work. "
+            f"I'm genuinely interested, but I need a little better pricing to feel good about it. "
             f"Could you do ${action.buyer_offer:.2f}?"
         )
     return (
-        f"I can improve my offer a bit from my previous position. "
-        f"If you can make ${action.buyer_offer:.2f} work, I can seriously consider closing."
+        f"I can come up a bit from where I started. "
+        f"If you can make ${action.buyer_offer:.2f} work, I'd be comfortable closing this out."
     )
 
 
@@ -288,116 +316,126 @@ async def stream_buyer_negotiation(
     target_price: float,
     max_acceptable_price: float,
 ) -> AsyncIterator[dict[str, Any]]:
-    seller_session = await create_negotiation_session(
-        user_id=user_id,
-        sku_id_default=sku_id_default,
-        max_rounds=MAX_ROUNDS,
-    )
-
-    constraints = BuyerConstraints(
-        target_price=round(target_price, 2),
-        max_acceptable_price=round(min(max_acceptable_price, float(seller_session.product.sale_price or 0)), 2),
-        list_price=float(seller_session.product.sale_price or 0),
-        max_rounds=MAX_ROUNDS,
-    )
-
-    transcript: list[BuyerAgentTurn] = []
-    final_price: float | None = None
-    outcome: BuyerOutcome = "max_rounds_reached"
     run_id = _new_run_id()
-
-    yield {
-        "type": "session_started",
-        "run_id": run_id,
-        "seller_session": seller_session.model_dump(),
-        "target_price": constraints.target_price,
-        "max_acceptable_price": constraints.max_acceptable_price,
-        "max_rounds": constraints.max_rounds,
-    }
-
-    for round_index in range(1, MAX_ROUNDS + 1):
-        previous_seller_turn = transcript[-1].seller_turn if transcript else None
-        yield {
-            "type": "thinking",
-            "phase": "buyer_decision",
-            "round_index": round_index,
-            "message": f"Buyer agent is planning round {round_index}.",
-        }
-        decision, buyer_message, llm_decision_verified, llm_verification_note = await _choose_llm_backed_decision(
-            constraints=constraints,
-            seller_session=seller_session,
-            transcript=transcript,
-            round_index=round_index,
-            seller_turn=previous_seller_turn,
+    _register_run(run_id)
+    try:
+        _ensure_run_active(run_id)
+        seller_session = await create_negotiation_session(
+            user_id=user_id,
+            sku_id_default=sku_id_default,
+            max_rounds=MAX_ROUNDS,
         )
-        if decision.action == "walk_away":
+
+        constraints = BuyerConstraints(
+            target_price=round(target_price, 2),
+            max_acceptable_price=round(min(max_acceptable_price, float(seller_session.product.sale_price or 0)), 2),
+            list_price=float(seller_session.product.sale_price or 0),
+            max_rounds=MAX_ROUNDS,
+        )
+
+        transcript: list[BuyerAgentTurn] = []
+        final_price: float | None = None
+        outcome: BuyerOutcome = "max_rounds_reached"
+
+        yield {
+            "type": "session_started",
+            "run_id": run_id,
+            "seller_session": seller_session.model_dump(),
+            "target_price": constraints.target_price,
+            "max_acceptable_price": constraints.max_acceptable_price,
+            "max_rounds": constraints.max_rounds,
+        }
+
+        for round_index in range(1, MAX_ROUNDS + 1):
+            _ensure_run_active(run_id)
+            previous_seller_turn = transcript[-1].seller_turn if transcript else None
+            yield {
+                "type": "thinking",
+                "phase": "buyer_decision",
+                "round_index": round_index,
+                "message": f"Buyer agent is planning round {round_index}.",
+            }
+            decision, buyer_message, llm_decision_verified, llm_verification_note = await _choose_llm_backed_decision(
+                constraints=constraints,
+                seller_session=seller_session,
+                transcript=transcript,
+                round_index=round_index,
+                seller_turn=previous_seller_turn,
+            )
+            _ensure_run_active(run_id)
+            if decision.action == "walk_away":
+                buyer_turn = BuyerAgentTurn(
+                    round_index=round_index,
+                    action="walk_away",
+                    buyer_offer=None,
+                    buyer_message=buyer_message,
+                    rationale=decision.rationale,
+                    llm_decision_verified=llm_decision_verified,
+                    llm_verification_note=llm_verification_note,
+                    seller_turn=None,
+                )
+                transcript.append(buyer_turn)
+                yield {"type": "buyer_turn", "turn": _serialize_buyer_turn(buyer_turn)}
+                outcome = "walked_away"
+                break
+
             buyer_turn = BuyerAgentTurn(
                 round_index=round_index,
-                action="walk_away",
-                buyer_offer=None,
+                action=decision.action,
+                buyer_offer=decision.buyer_offer,
                 buyer_message=buyer_message,
                 rationale=decision.rationale,
                 llm_decision_verified=llm_decision_verified,
                 llm_verification_note=llm_verification_note,
                 seller_turn=None,
             )
-            transcript.append(buyer_turn)
             yield {"type": "buyer_turn", "turn": _serialize_buyer_turn(buyer_turn)}
-            outcome = "walked_away"
-            break
 
-        buyer_turn = BuyerAgentTurn(
-            round_index=round_index,
-            action=decision.action,
-            buyer_offer=decision.buyer_offer,
-            buyer_message=buyer_message,
-            rationale=decision.rationale,
-            llm_decision_verified=llm_decision_verified,
-            llm_verification_note=llm_verification_note,
-            seller_turn=None,
-        )
-        yield {"type": "buyer_turn", "turn": _serialize_buyer_turn(buyer_turn)}
+            yield {
+                "type": "thinking",
+                "phase": "seller_response",
+                "round_index": round_index,
+                "message": f"Seller agent is evaluating round {round_index}.",
+            }
+            seller_turn = await submit_buyer_offer(
+                seller_session,
+                NegotiationOfferIn(
+                    buyer_offer=decision.buyer_offer,
+                    buyer_message=buyer_message,
+                ),
+            )
+            _ensure_run_active(run_id)
+            buyer_turn.seller_turn = seller_turn
+            transcript.append(buyer_turn)
+            yield {"type": "seller_turn", "turn": _serialize_seller_turn(seller_turn)}
 
-        yield {
-            "type": "thinking",
-            "phase": "seller_response",
-            "round_index": round_index,
-            "message": f"Seller agent is evaluating round {round_index}.",
-        }
-        seller_turn = await submit_buyer_offer(
-            seller_session,
-            NegotiationOfferIn(
-                buyer_offer=decision.buyer_offer,
-                buyer_message=buyer_message,
-            ),
-        )
-        buyer_turn.seller_turn = seller_turn
-        transcript.append(buyer_turn)
-        yield {"type": "seller_turn", "turn": _serialize_seller_turn(seller_turn)}
+            if seller_turn.seller_decision == "accept":
+                final_price = float(seller_turn.seller_counter_price or decision.buyer_offer or 0)
+                outcome = "accepted"
+                break
 
-        if seller_turn.seller_decision == "accept":
-            final_price = float(seller_turn.seller_counter_price or decision.buyer_offer or 0)
+            if seller_session.closed:
+                outcome = "seller_closed"
+                break
+
+        if outcome == "max_rounds_reached" and seller_session.accepted_price is not None:
             outcome = "accepted"
-            break
+            final_price = float(seller_session.accepted_price)
 
-        if seller_session.closed:
-            outcome = "seller_closed"
-            break
-
-    if outcome == "max_rounds_reached" and seller_session.accepted_price is not None:
-        outcome = "accepted"
-        final_price = float(seller_session.accepted_price)
-
-    result = BuyerAgentRunResult(
-        run_id=run_id,
-        user_id=user_id,
-        sku_id_default=sku_id_default,
-        target_price=constraints.target_price,
-        max_acceptable_price=constraints.max_acceptable_price,
-        outcome=outcome,
-        final_price=final_price,
-        summary=_build_summary(outcome, final_price, constraints),
-        seller_session=seller_session,
-        turns=transcript,
-    )
-    yield {"type": "done", "result": result.model_dump()}
+        result = BuyerAgentRunResult(
+            run_id=run_id,
+            user_id=user_id,
+            sku_id_default=sku_id_default,
+            target_price=constraints.target_price,
+            max_acceptable_price=constraints.max_acceptable_price,
+            outcome=outcome,
+            final_price=final_price,
+            summary=_build_summary(outcome, final_price, constraints),
+            seller_session=seller_session,
+            turns=transcript,
+        )
+        yield {"type": "done", "result": result.model_dump()}
+    except BuyerAgentRunCancelled:
+        yield {"type": "error", "error": "Buyer agent negotiation cancelled.", "run_id": run_id}
+    finally:
+        _clear_run(run_id)

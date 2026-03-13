@@ -29,7 +29,11 @@ Rules:
 3) If action is "accept_seller_price", only do so when the seller's latest price is acceptable.
 4) If action is "walk_away", buyer_offer must be null.
 5) Keep rationale concise and operational.
-6) Keep buyer_message natural, persuasive, and short.
+6) Keep buyer_message natural, persuasive, and specific, like a real shopper talking to a seller.
+7) Avoid stiff corporate language such as "proceed to order confirmation", "acceptable boundary", or "current negotiation state".
+8) When making an offer, mention a concrete everyday reason when possible: budget, comparing options, needing the deal to make sense, or being ready to buy today.
+9) Sound warm, practical, and human. Short sentences are fine, but do not sound robotic.
+10) If this is not the first round, acknowledge the seller's latest number before making the next move.
 7) Do not output anything except valid JSON.
 """.strip()
 

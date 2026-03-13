@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
+  cancelBuyerAgentNegotiation,
   createNegotiationSession,
   fetchNegotiationSession,
   streamBuyerAgentNegotiation,
@@ -130,7 +131,11 @@ export default function NegotiationPage() {
   const [isRunningAgent, setIsRunningAgent] = useState(false);
   const [agentResult, setAgentResult] = useState<BuyerAgentRunResult | null>(null);
   const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
+  const [thinkingStartedAt, setThinkingStartedAt] = useState<number | null>(null);
+  const [thinkingElapsedSeconds, setThinkingElapsedSeconds] = useState(0);
   const hasAutoStartedRef = useRef(false);
+  const activeRunIdRef = useRef<string | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   const priceLabel = useMemo(() => {
     const amount = price ? Number(price) : null;
@@ -332,6 +337,20 @@ export default function NegotiationPage() {
   }
 
   useEffect(() => {
+    if (!thinkingStartedAt) {
+      setThinkingElapsedSeconds(0);
+      return;
+    }
+
+    setThinkingElapsedSeconds(Math.max(0, Math.floor((Date.now() - thinkingStartedAt) / 1000)));
+    const timer = window.setInterval(() => {
+      setThinkingElapsedSeconds(Math.max(0, Math.floor((Date.now() - thinkingStartedAt) / 1000)));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [thinkingStartedAt]);
+
+  useEffect(() => {
     const baseMessages = mode === "manual" ? manualMessages : agentMessages;
     if (mode === "agent" && thinkingMessage) {
       setMessages([
@@ -341,14 +360,14 @@ export default function NegotiationPage() {
           role: "seller",
           label: "System",
           content: thinkingMessage,
-          meta: "Thinking...",
+          meta: `${thinkingElapsedSeconds}s`,
           pending: true,
         },
       ]);
       return;
     }
     setMessages(baseMessages);
-  }, [agentMessages, manualMessages, mode, thinkingMessage]);
+  }, [agentMessages, manualMessages, mode, thinkingElapsedSeconds, thinkingMessage]);
 
   useEffect(() => {
     if (mode === "manual") {
@@ -357,6 +376,7 @@ export default function NegotiationPage() {
         setStatus(manualSession.closed ? "Negotiation closed." : "Seller is ready for your offer.");
       }
       setThinkingMessage(null);
+      setThinkingStartedAt(null);
       return;
     }
 
@@ -376,30 +396,37 @@ export default function NegotiationPage() {
   const buildStreamEvent = useCallback((event: BuyerAgentStreamEvent) => {
     if (event.type === "thinking") {
       setThinkingMessage(event.message);
+      setThinkingStartedAt(Date.now());
       return;
     }
 
     if (event.type === "session_started") {
+      activeRunIdRef.current = event.run_id;
       setSession(event.seller_session);
       setStatus("Buyer agent started. Waiting for round 1.");
       setThinkingMessage("Buyer agent is preparing the opening offer.");
+      setThinkingStartedAt(Date.now());
       return;
     }
 
     if (event.type === "buyer_turn") {
       setThinkingMessage("Seller agent is evaluating the new offer.");
+      setThinkingStartedAt(Date.now());
       setAgentMessages((current) => [...current, buildBuyerAgentBubble(event.turn)]);
       return;
     }
 
     if (event.type === "seller_turn") {
       setThinkingMessage("Buyer agent is reviewing the seller response.");
+      setThinkingStartedAt(Date.now());
       setAgentMessages((current) => [...current, { ...buildSellerBubble(event.turn), label: "Seller Agent" }]);
       return;
     }
 
     if (event.type === "done") {
+      activeRunIdRef.current = event.result.run_id;
       setThinkingMessage(null);
+      setThinkingStartedAt(null);
       setAgentResult(event.result);
       setIsRunningAgent(false);
       setSession(event.result.seller_session);
@@ -435,7 +462,11 @@ export default function NegotiationPage() {
     }
 
     if (event.type === "error") {
+      if (event.run_id) {
+        activeRunIdRef.current = event.run_id;
+      }
       setThinkingMessage(null);
+      setThinkingStartedAt(null);
       setIsRunningAgent(false);
       setError(event.error);
       setStatus("Buyer agent negotiation failed.");
@@ -464,7 +495,11 @@ export default function NegotiationPage() {
     setAgentResult(null);
     setAgentMessages([]);
     setThinkingMessage("Buyer agent is preparing the opening offer.");
+    setThinkingStartedAt(Date.now());
     setStatus("Buyer agent is bargaining with the seller...");
+    activeRunIdRef.current = null;
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = new AbortController();
 
     try {
       await streamBuyerAgentNegotiation(
@@ -474,15 +509,19 @@ export default function NegotiationPage() {
         maxAcceptablePrice: parsedMax,
         },
         buildStreamEvent,
+        { signal: streamAbortRef.current.signal },
       );
     } catch (runError) {
       const message =
         runError instanceof Error ? runError.message : "Could not run buyer agent negotiation.";
-      setError(message);
-      setThinkingMessage(null);
-      setStatus("Buyer agent negotiation failed.");
+      if (message !== "This operation was aborted" && message !== "signal is aborted without reason") {
+        setError(message);
+        setThinkingMessage(null);
+        setStatus("Buyer agent negotiation failed.");
+      }
     } finally {
       setIsRunningAgent(false);
+      streamAbortRef.current = null;
     }
   }, [
     buildStreamEvent,
@@ -491,6 +530,24 @@ export default function NegotiationPage() {
     sku,
     targetPrice,
   ]);
+
+  async function handleCancelBuyerAgent() {
+    if (isRunningAgent && activeRunIdRef.current) {
+      try {
+        await cancelBuyerAgentNegotiation(activeRunIdRef.current);
+      } catch {
+        // Ignore and still abort client-side stream.
+      }
+    }
+
+    streamAbortRef.current?.abort();
+    setIsRunningAgent(false);
+    setThinkingMessage(null);
+    setThinkingStartedAt(null);
+    setStatus("Buyer agent negotiation cancelled.");
+    setError("");
+    router.push("/recommendations");
+  }
 
   useEffect(() => {
     if (!autoStart || hasAutoStartedRef.current || !isAuthenticated || !sku) {
@@ -695,7 +752,14 @@ export default function NegotiationPage() {
                     />
                   </label>
                 </div>
-                <div>
+                <div className="flex items-center gap-3">
+                  <button
+                    className="h-12 rounded-full border border-[#d7e1ec] bg-white px-5 text-sm font-semibold text-[#344054] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => void handleCancelBuyerAgent()}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
                   <button
                     className="h-12 rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isRunningAgent || !targetPrice.trim() || !maxAcceptablePrice.trim()}

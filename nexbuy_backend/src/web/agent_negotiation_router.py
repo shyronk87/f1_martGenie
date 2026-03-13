@@ -4,8 +4,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from src.buy_agent.schema import BuyerAgentRunIn, BuyerAgentRunResult
-from src.buy_agent.service import run_buyer_negotiation, stream_buyer_negotiation
+from src.buy_agent.schema import BuyerAgentCancelResponse, BuyerAgentRunIn, BuyerAgentRunResult
+from src.buy_agent.service import cancel_buyer_run, run_buyer_negotiation, stream_buyer_negotiation
 from src.web.auth.dependencies import CurrentActiveUser
 from src.web.auth.models import User
 
@@ -53,3 +53,17 @@ async def stream_agent_negotiation(
             yield _sse({"type": "error", "error": f"Buyer agent stream failed: {exc}"})
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.post("/run/{run_id}/cancel", response_model=BuyerAgentCancelResponse)
+async def cancel_agent_negotiation(
+    run_id: str,
+    user: User = Depends(CurrentActiveUser),
+) -> BuyerAgentCancelResponse:
+    del user
+    cancelled = cancel_buyer_run(run_id)
+    return BuyerAgentCancelResponse(
+        run_id=run_id,
+        cancelled=cancelled,
+        message="Cancellation requested." if cancelled else "Run not found or already finished.",
+    )

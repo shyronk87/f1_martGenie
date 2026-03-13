@@ -58,20 +58,20 @@ def _build_seller_message(
 ) -> str:
     if decision == "need_offer":
         return (
-            "Please share your target price so I can evaluate it against the current seller range."
+            "Send me the number you have in mind, and I'll tell you honestly how close I can get."
         )
     if decision == "accept":
         return (
-            f"Your offer works for us. We can close at ${counter_price:.2f} and proceed to order confirmation."
+            f"That works for us. We can do ${counter_price:.2f} and wrap this up."
         )
     if decision == "counter":
         return (
-            f"Thanks for the offer. We can do ${counter_price:.2f}. "
-            f"Current expected deal level is around ${current_target:.2f}."
+            f"Thanks for the offer. I can't do that number, but I can meet you at ${counter_price:.2f}. "
+            f"That's already a meaningful move from where we started."
         )
     if decision == "reject":
         return (
-            f"That is below our acceptable range. The minimum acceptable level is ${min_expected:.2f}."
+            f"That's lower than we can do on this item. The lowest workable number on our side is ${min_expected:.2f}."
         )
     return "This negotiation is already closed."
 
@@ -133,4 +133,3 @@ def seller_decide(session: NegotiationSession, buyer_offer: float | None) -> Neg
         current_target_price=round(current_target, 2),
         min_expected_price=round(min_expected, 2),
     )
-

@@ -129,8 +129,8 @@ def _build_recommendation_filters(profile: Any) -> QueryFilters:
 
     return QueryFilters(
         query_text=" ".join(query_text_parts),
-        final_limit=8,
-        limit=8,
+        final_limit=48,
+        limit=48,
         vector_top_k=1,
         semantic_weight=0.0,
         keyword_weight=1.0,
@@ -170,21 +170,58 @@ def _build_product_reason(product: Any, profile: Any) -> tuple[str, list[str]]:
         tags.append(profile.price_philosophy)
 
     tags = _dedupe_keep_order(tags)[:3]
-    reason_parts: list[str] = []
-    if profile.style_preferences:
-        reason_parts.append(f"matches your {profile.style_preferences[0]} taste")
-    if profile.room_priorities:
-        reason_parts.append(f"fits your {profile.room_priorities[0]} priority")
-    if "cat" in members or "dog" in members:
-        reason_parts.append("works for a pet-aware home")
-    elif "toddler" in members:
-        reason_parts.append("leans safer for family use")
-    elif profile.price_philosophy:
-        reason_parts.append(f"aligns with your {profile.price_philosophy} budget preference")
+    product_type = product.category_name_3 or product.category_name_2 or product.category_name_1 or "piece"
+    product_type = str(product_type).strip().lower()
+    style = profile.style_preferences[0] if profile.style_preferences else None
+    room = profile.room_priorities[0] if profile.room_priorities else None
+    philosophy = (profile.price_philosophy or "").lower()
+    price = _money(getattr(product, "sale_price", None))
+    price_text = f"${price:,.0f}" if price > 0 else "this price point"
 
-    if not reason_parts:
-        reason_parts.append("fits your saved preference profile")
-    return "Recommended because it " + ", ".join(reason_parts[:2]) + ".", tags
+    reason: str
+    if style and room:
+        reason = f"This {product_type} keeps the {style.lower()} direction while fitting your {room.lower()} setup."
+    elif style:
+        reason = f"This {product_type} stays close to the {style.lower()} look you tend to prefer."
+    elif room:
+        reason = f"This {product_type} makes sense for the {room.lower()} area you prioritize most."
+    else:
+        reason = f"This {product_type} lines up well with the preferences saved in your profile."
+
+    if "cat" in members or "dog" in members:
+        reason += " It also feels like a safer pick for a home with pets."
+    elif "toddler" in members:
+        reason += " It also reads like an easier fit for a family-focused home."
+    elif philosophy == "value":
+        reason += f" At {price_text}, it stays closer to a value-first budget."
+    elif philosophy == "balanced":
+        reason += f" At {price_text}, it lands in a balanced range for quality and spend."
+    elif philosophy == "premium":
+        reason += f" At {price_text}, it fits a more premium buying direction."
+
+    return reason, tags
+
+
+def _recommendation_group_key(product: Any) -> str:
+    return str(product.category_name_2 or product.category_name_1 or "Recommended").strip() or "Recommended"
+
+
+def _select_grouped_recommendations(products: list[Any], *, max_groups: int = 4, per_group: int = 4) -> list[Any]:
+    grouped: dict[str, list[Any]] = {}
+    for product in products:
+        key = _recommendation_group_key(product)
+        grouped.setdefault(key, [])
+        if len(grouped[key]) < per_group:
+            grouped[key].append(product)
+
+    eligible_groups = [items for items in grouped.values() if items]
+    eligible_groups.sort(key=lambda items: len(items), reverse=True)
+
+    selected_products: list[Any] = []
+    for group_items in eligible_groups[:max_groups]:
+        selected_products.extend(group_items[:per_group])
+
+    return selected_products
 
 
 async def _fetch_products_by_sku(
@@ -544,9 +581,10 @@ async def get_memory_recommendations(
     profile = memory_response.profile
     filters = _build_recommendation_filters(profile)
     products = await query_products(filters)
+    selected_products = _select_grouped_recommendations(products)
 
     recommendation_products: list[PlazaRecommendationProduct] = []
-    for product in products:
+    for product in selected_products:
         reason, matched_tags = _build_product_reason(product, profile)
         recommendation_products.append(
             PlazaRecommendationProduct(

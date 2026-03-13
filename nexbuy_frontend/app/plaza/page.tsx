@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchCurrentUser, readAccessToken } from "@/lib/auth";
+import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
   fetchPlazaRecommendations,
   fetchPlazaShowcaseDetail,
@@ -12,6 +12,7 @@ import {
   type PlazaShowcaseDetail,
   type PlazaShowcaseSummary,
 } from "@/lib/plaza-api";
+import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
 function formatMoney(value: number, currencySymbol = "$") {
@@ -69,6 +70,10 @@ function buildCollectionTone(detail: PlazaShowcaseDetail | null) {
   return "Curated";
 }
 
+function buildRecommendationGroupLabel(product: PlazaRecommendationProduct) {
+  return product.category_name_2 || product.category_name_1 || "Recommended";
+}
+
 export default function PlazaPage() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [error, setError] = useState("");
@@ -78,6 +83,7 @@ export default function PlazaPage() {
   const [recommendationError, setRecommendationError] = useState("");
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +171,19 @@ export default function PlazaPage() {
   }
 
   const recommendationProducts = recommendations?.products ?? [];
+  const recommendationGroups = recommendationProducts.reduce<Array<{ label: string; products: PlazaRecommendationProduct[] }>>(
+    (groups, product) => {
+      const label = buildRecommendationGroupLabel(product);
+      const existing = groups.find((group) => group.label === label);
+      if (existing) {
+        existing.products.push(product);
+      } else {
+        groups.push({ label, products: [product] });
+      }
+      return groups;
+    },
+    [],
+  );
 
   function renderRecommendationCard(product: PlazaRecommendationProduct) {
     return (
@@ -179,28 +198,9 @@ export default function PlazaPage() {
           ) : null}
         </div>
         <div className="p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8b8177]">
-            {[product.category_name_2, product.category_name_3].filter(Boolean).join(" / ") || product.category_name_1 || "Product"}
-          </p>
-          <h3 className="mt-2 text-base font-bold leading-6 text-[#27272a]">{product.title}</h3>
+          <h3 className="text-base font-bold leading-6 text-[#27272a]">{product.title}</h3>
           <p className="mt-3 text-sm leading-6 text-[#5f564d]">{product.recommendation_reason}</p>
-          <div className="mt-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#8b8177]">Price</p>
-              <p className="mt-1 text-lg font-black text-[#18181b]">{formatMoney(product.sale_price ?? 0)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#8b8177]">Status</p>
-              <p className="mt-1 text-sm font-semibold text-[#22a06b]">{product.stock_status_text ?? "Available"}</p>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {product.matched_memory_tags.map((tag) => (
-              <span className="rounded-full bg-[#eef2ff] px-3 py-1 text-xs font-bold text-[#5b53d8]" key={`${product.sku_id_default}-${tag}`}>
-                {tag}
-              </span>
-            ))}
-          </div>
+          <p className="mt-4 text-lg font-black text-[#18181b]">{formatMoney(product.sale_price ?? 0)}</p>
         </div>
       </article>
     );
@@ -210,7 +210,16 @@ export default function PlazaPage() {
     <main className="min-h-screen bg-[#f5f5f4] text-[#18181b]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(216,180,254,0.12),transparent_24%),radial-gradient(circle_at_85%_10%,rgba(187,247,208,0.16),transparent_18%),linear-gradient(180deg,#fbfbfb_0%,#f3f4f6_100%)]" />
       <div className="relative">
-        <Navbar isAuthenticated={false} onOpenAuth={() => undefined} onSignOut={() => undefined} />
+        <Navbar
+          isAuthenticated={isAuthenticated}
+          isBlurred={authOpen}
+          onOpenAuth={() => setAuthOpen(true)}
+          onSignOut={() => {
+            clearAccessToken();
+            setIsAuthenticated(false);
+            setRecommendations(null);
+          }}
+        />
 
         <section className="mx-auto max-w-[1380px] px-6 pb-16 pt-28">
           <div className="rounded-[36px] border border-[#e8e5df] bg-white/92 p-8 shadow-[0_24px_80px_rgba(24,24,27,0.06)] md:p-10">
@@ -223,21 +232,9 @@ export default function PlazaPage() {
             <div className={error ? "mt-10 rounded-[30px] border border-[#ebe7df] bg-[#fcfcfb] p-6 md:p-8" : "rounded-[30px] border border-[#ebe7df] bg-[#fcfcfb] p-6 md:p-8"}>
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8f5b18]">Recommended For You</p>
-                  <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#18110a]">
-                    Picks shaped by your saved memory profile
+                  <h2 className="text-5xl font-black tracking-[0.04em] text-[#8f5b18] md:text-6xl">
+                    Recommended For You
                   </h2>
-                  <p className="mt-3 max-w-2xl text-base leading-7 text-[#5f564d]">
-                    {recommendations?.memory_summary ??
-                      "Sign in and complete your profile to unlock fast, memory-based product recommendations."}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(recommendations?.reason_tags ?? []).map((tag) => (
-                    <span className="rounded-full border border-[#e4ddff] bg-[#f7f5ff] px-3 py-2 text-xs font-bold text-[#5b53d8]" key={tag}>
-                      {tag}
-                    </span>
-                  ))}
                 </div>
               </div>
 
@@ -248,17 +245,24 @@ export default function PlazaPage() {
               ) : null}
 
               {isLoadingRecommendations ? (
-                <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <div className="overflow-hidden rounded-[24px] border border-[#ece7df] bg-white" key={index}>
-                      <div className="h-56 animate-pulse bg-[#f4f4f5]" />
-                      <div className="space-y-3 p-4">
-                        <div className="h-3 w-24 animate-pulse rounded bg-[#f1f0eb]" />
-                        <div className="h-6 w-full animate-pulse rounded bg-[#f1f0eb]" />
-                        <div className="h-4 w-full animate-pulse rounded bg-[#f1f0eb]" />
-                        <div className="h-4 w-2/3 animate-pulse rounded bg-[#f1f0eb]" />
+                <div className="mt-8 space-y-8">
+                  {Array.from({ length: 4 }).map((_, groupIndex) => (
+                    <section key={groupIndex}>
+                      <div className="h-6 w-40 animate-pulse rounded bg-[#f1f0eb]" />
+                      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {Array.from({ length: 4 }).map((__, cardIndex) => (
+                          <div className="overflow-hidden rounded-[24px] border border-[#ece7df] bg-white" key={`${groupIndex}-${cardIndex}`}>
+                            <div className="h-56 animate-pulse bg-[#f4f4f5]" />
+                            <div className="space-y-3 p-4">
+                              <div className="h-3 w-24 animate-pulse rounded bg-[#f1f0eb]" />
+                              <div className="h-6 w-full animate-pulse rounded bg-[#f1f0eb]" />
+                              <div className="h-4 w-full animate-pulse rounded bg-[#f1f0eb]" />
+                              <div className="h-4 w-2/3 animate-pulse rounded bg-[#f1f0eb]" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
+                    </section>
                   ))}
                 </div>
               ) : null}
@@ -276,8 +280,17 @@ export default function PlazaPage() {
               ) : null}
 
               {!isLoadingRecommendations && isAuthenticated && !recommendations?.onboarding_required && recommendationProducts.length > 0 ? (
-                <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {recommendationProducts.map((product) => renderRecommendationCard(product))}
+                <div className="mt-8 space-y-10">
+                  {recommendationGroups.map((group) => (
+                    <section key={group.label}>
+                      <div className="flex items-center gap-4">
+                        <h3 className="text-2xl font-black tracking-[-0.04em] text-[#18110a]">{group.label}</h3>
+                      </div>
+                      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {group.products.map((product) => renderRecommendationCard(product))}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               ) : null}
             </div>
@@ -407,6 +420,30 @@ export default function PlazaPage() {
             </div>
           </div>
         </section>
+
+        <AuthModal
+          onAuthSuccess={async () => {
+            const token = readAccessToken();
+            if (!token) {
+              return;
+            }
+            await fetchCurrentUser(token);
+            setIsAuthenticated(true);
+            try {
+              const recommendationPayload = await fetchPlazaRecommendations();
+              setRecommendations(recommendationPayload);
+              setRecommendationError("");
+            } catch (recommendationLoadError) {
+              setRecommendationError(
+                recommendationLoadError instanceof Error
+                  ? recommendationLoadError.message
+                  : "Could not load personalized recommendations.",
+              );
+            }
+          }}
+          onClose={() => setAuthOpen(false)}
+          open={authOpen}
+        />
       </div>
     </main>
   );

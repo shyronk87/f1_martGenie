@@ -99,6 +99,34 @@ def _fallback(
     return BundleComposeResult(options=options[:MAX_OPTIONS])
 
 
+def _selection_signature(option: BundleOption) -> tuple[str, ...]:
+    return tuple(sorted(_normalize_sku(selection.sku) for selection in option.selections if selection.sku))
+
+
+def _ensure_three_options(
+    draft: BundleComposeResult,
+    candidates: list[ProductRow],
+    analysis: UserContentAnalysisResult,
+) -> BundleComposeResult:
+    if len(draft.options) >= MAX_OPTIONS:
+        return draft
+
+    fallback = _fallback(candidates, analysis=analysis)
+    existing = {_selection_signature(option) for option in draft.options}
+    merged = list(draft.options)
+
+    for option in fallback.options:
+        signature = _selection_signature(option)
+        if not signature or signature in existing:
+            continue
+        merged.append(option)
+        existing.add(signature)
+        if len(merged) >= MAX_OPTIONS:
+            break
+
+    return BundleComposeResult(options=merged[:MAX_OPTIONS])
+
+
 def _normalize_sku(value: str) -> str:
     return value.strip().upper()
 
@@ -401,7 +429,11 @@ async def compose_bundle_with_ai(
                 return None, f"[bundle_composer] {tag} got no valid sku"
             if total_guard_drops > 0:
                 logs.append(f"[bundle_composer] {tag} guard dropped {total_guard_drops} conflicting set selections")
-            return BundleComposeResult(options=valid_options), None
+            return _ensure_three_options(
+                BundleComposeResult(options=valid_options),
+                ranked_candidates,
+                analysis,
+            ), None
         except asyncio.TimeoutError:
             return None, f"[bundle_composer] {tag} timeout after {timeout_seconds}s"
         except Exception as exc:

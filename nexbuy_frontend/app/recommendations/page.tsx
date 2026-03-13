@@ -236,7 +236,9 @@ export default function RecommendationsPage() {
                             {Math.round(plan.confidence * 100)}% fit
                           </span>
                         </div>
-                        <p className="mt-3 text-sm leading-7 text-[#667085]">{plan.summary}</p>
+                        <p className="mt-3 text-sm font-medium leading-7 text-[#344054]">
+                          {plan.explanation || plan.summary}
+                        </p>
                         <p className="mt-4 text-3xl font-black text-[#101828]">
                           ${plan.totalPrice.toLocaleString()}
                         </p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken, type AuthUser } from "@/lib/auth";
 import {
   fetchMemoryProfile,
@@ -10,6 +10,14 @@ import {
   type MemoryProfilePayload,
   type OnboardingQuestion,
 } from "@/lib/memory-api";
+import {
+  createUserAddress,
+  fetchUserAddresses,
+  setDefaultUserAddress,
+  updateUserAddress,
+  type UserAddress,
+  type UserAddressPayload,
+} from "@/lib/profile-api";
 import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
@@ -41,6 +49,37 @@ function hasAnyAnswer(answers: Record<string, string | string[]>) {
   );
 }
 
+function emptyAddress(): UserAddressPayload {
+  return {
+    recipient_name: null,
+    phone_number: null,
+    country: null,
+    province_state: null,
+    city: null,
+    district: null,
+    street_line_1: null,
+    street_line_2: null,
+    postal_code: null,
+    delivery_notes: null,
+    is_default: false,
+  };
+}
+
+function addressField(value: string | null | undefined) {
+  return value && value.trim().length > 0 ? value : "Not set";
+}
+
+function formatAddressLine(address: UserAddress) {
+  return [address.country, address.province_state, address.city, address.district]
+    .filter((value) => typeof value === "string" && value.trim().length > 0)
+    .join(" / ");
+}
+
+type AddressDraft = {
+  id: string | null;
+  payload: UserAddressPayload;
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
@@ -53,67 +92,56 @@ export default function ProfilePage() {
   const [questions, setQuestions] = useState<OnboardingQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [savedAnswers, setSavedAnswers] = useState<Record<string, string | string[]>>({});
-  const [isEditing, setIsEditing] = useState(false);
+  const [addresses, setAddresses] = useState<UserAddress[]>([]);
+  const [activeSection, setActiveSection] = useState<"memory" | "address">("memory");
+  const [isEditingMemory, setIsEditingMemory] = useState(false);
+  const [addressDraft, setAddressDraft] = useState<AddressDraft | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  async function bootstrap() {
+    setIsLoading(true);
+    setError("");
 
-    async function bootstrap() {
-      setIsLoading(true);
-      setError("");
-
-      const token = readAccessToken();
-      if (!token) {
-        if (!cancelled) {
-          setIsAuthenticated(false);
-          setUser(null);
-          setIsLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const [currentUser, memory, onboardingQuestions] = await Promise.all([
-          fetchCurrentUser(token),
-          fetchMemoryProfile(),
-          fetchOnboardingQuestions(),
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        setUser(currentUser);
-        setIsAuthenticated(true);
-        setQuestions(onboardingQuestions);
-        const initialAnswers = buildAnswersFromProfile(memory.profile);
-        setAnswers(initialAnswers);
-        setSavedAnswers(initialAnswers);
-        setIsEditing(false);
-      } catch (bootstrapError) {
-        if (cancelled) {
-          return;
-        }
-
-        clearAccessToken();
-        setIsAuthenticated(false);
-        setUser(null);
-        setError(
-          bootstrapError instanceof Error
-            ? bootstrapError.message
-            : "Could not load your profile details.",
-        );
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
+    const token = readAccessToken();
+    if (!token) {
+      setIsAuthenticated(false);
+      setUser(null);
+      setIsLoading(false);
+      return;
     }
 
+    try {
+      const [currentUser, memory, onboardingQuestions, addressResponse] = await Promise.all([
+        fetchCurrentUser(token),
+        fetchMemoryProfile(),
+        fetchOnboardingQuestions(),
+        fetchUserAddresses(),
+      ]);
+
+      setUser(currentUser);
+      setIsAuthenticated(true);
+      setQuestions(onboardingQuestions);
+      const initialAnswers = buildAnswersFromProfile(memory.profile);
+      setAnswers(initialAnswers);
+      setSavedAnswers(initialAnswers);
+      setAddresses(addressResponse.addresses);
+      setIsEditingMemory(false);
+      setAddressDraft(null);
+    } catch (bootstrapError) {
+      clearAccessToken();
+      setIsAuthenticated(false);
+      setUser(null);
+      setError(
+        bootstrapError instanceof Error
+          ? bootstrapError.message
+          : "Could not load your profile details.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
     void bootstrap();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   function setMultiValue(questionKey: string, value: string, checked: boolean) {
@@ -127,7 +155,7 @@ export default function ProfilePage() {
     });
   }
 
-  async function handleSave() {
+  async function handleSaveMemory() {
     setIsSaving(true);
     setError("");
     setSaveMessage("");
@@ -155,7 +183,7 @@ export default function ProfilePage() {
       });
 
       setSavedAnswers(answers);
-      setIsEditing(false);
+      setIsEditingMemory(false);
       setSaveMessage("Your memory preferences have been updated.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save your changes.");
@@ -163,6 +191,46 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   }
+
+  async function handleSaveAddress() {
+    if (!addressDraft) {
+      return;
+    }
+
+    setIsSaving(true);
+    setError("");
+    setSaveMessage("");
+
+    try {
+      const response = addressDraft.id
+        ? await updateUserAddress(addressDraft.id, addressDraft.payload)
+        : await createUserAddress(addressDraft.payload);
+      setAddresses(response.addresses);
+      setAddressDraft(null);
+      setSaveMessage("Your address information has been updated.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save your address.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleSetDefaultAddress(addressId: string) {
+    setError("");
+    setSaveMessage("");
+    try {
+      const response = await setDefaultUserAddress(addressId);
+      setAddresses(response.addresses);
+      setSaveMessage("Default address updated.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not update default address.");
+    }
+  }
+
+  const defaultAddressId = useMemo(
+    () => addresses.find((address) => address.is_default)?.id ?? null,
+    [addresses],
+  );
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-[#101828]">
@@ -187,7 +255,12 @@ export default function ProfilePage() {
               </p>
               <div className="mt-4 space-y-2">
                 <button
-                  className="flex w-full items-center justify-between rounded-[24px] border border-[#dbe3ed] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] px-4 py-4 text-left shadow-[0_12px_28px_rgba(59,130,246,0.08)]"
+                  className={`flex w-full items-center justify-between rounded-[24px] border px-4 py-4 text-left shadow-[0_12px_28px_rgba(59,130,246,0.08)] ${
+                    activeSection === "memory"
+                      ? "border-[#dbe3ed] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)]"
+                      : "border-[#dde4ed] bg-white"
+                  }`}
+                  onClick={() => setActiveSection("memory")}
                   type="button"
                 >
                   <span>
@@ -195,7 +268,25 @@ export default function ProfilePage() {
                     <span className="mt-1 block text-sm text-[#4b5563]">Review and update your saved preferences</span>
                   </span>
                   <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-[#1d4ed8]">
-                    Active
+                    {activeSection === "memory" ? "Active" : "Open"}
+                  </span>
+                </button>
+
+                <button
+                  className={`flex w-full items-center justify-between rounded-[24px] border px-4 py-4 text-left shadow-[0_12px_28px_rgba(59,130,246,0.08)] ${
+                    activeSection === "address"
+                      ? "border-[#dbe3ed] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)]"
+                      : "border-[#dde4ed] bg-white"
+                  }`}
+                  onClick={() => setActiveSection("address")}
+                  type="button"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-[#1d4ed8]">Address information</span>
+                    <span className="mt-1 block text-sm text-[#4b5563]">Manage your shipping addresses</span>
+                  </span>
+                  <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-[#1d4ed8]">
+                    {activeSection === "address" ? "Active" : "Open"}
                   </span>
                 </button>
               </div>
@@ -204,13 +295,15 @@ export default function ProfilePage() {
             <section className="rounded-[32px] border border-[#dde4ed] bg-white/90 shadow-[0_24px_80px_rgba(148,163,184,0.12)] backdrop-blur-xl">
               <div className="border-b border-[#e4e9f0] px-6 py-6 md:px-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8b97a8]">
-                  Long-term memory
+                  {activeSection === "memory" ? "Long-term memory" : "Address information"}
                 </p>
                 <h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#101828]">
-                  Your saved shopping preferences
+                  {activeSection === "memory" ? "Your saved shopping preferences" : "Your saved delivery addresses"}
                 </h2>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-[#667085]">
-                  Review what Nexbuy already knows about your style, household, and shopping habits. Edit them anytime when your preferences change.
+                  {activeSection === "memory"
+                    ? "Review what Nexbuy already knows about your style, household, and shopping habits. Edit them anytime when your preferences change."
+                    : "Save up to three addresses, choose a default one for future orders, and update any address when your delivery details change."}
                 </p>
               </div>
 
@@ -224,47 +317,121 @@ export default function ProfilePage() {
                       />
                     ))}
                   </div>
-                ) : !isAuthenticated ? null : (
+                ) : !isAuthenticated ? (
+                  <div className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">
+                    <p className="text-lg font-semibold text-[#101828]">Sign in to view your profile</p>
+                    <p className="mt-2 text-sm leading-7 text-[#667085]">
+                      This page stores personal preferences and shipping details, so it is only available after authentication.
+                    </p>
+                    <div className="mt-4">
+                      <button
+                        className="inline-flex h-[48px] items-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white"
+                        onClick={() => setAuthOpen(true)}
+                        type="button"
+                      >
+                        Sign in
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                   <div className="space-y-5">
                     <div className="flex items-start justify-between gap-4 rounded-[28px] border border-[#e5eaf1] bg-[#f8fafc] px-5 py-4">
                       <div>
                         <p className="text-sm font-semibold text-[#101828]">{user?.email}</p>
                         <p className="mt-1 text-sm text-[#667085]">
-                          {hasAnyAnswer(savedAnswers)
-                            ? "These are the answers currently saved to your profile."
-                            : "You have not saved any long-term memory answers yet."}
+                          {activeSection === "memory"
+                            ? hasAnyAnswer(savedAnswers)
+                              ? "These are the answers currently saved to your profile."
+                              : "You have not saved any long-term memory answers yet."
+                            : `${addresses.length}/3 addresses saved${defaultAddressId ? ", with one set as default." : "."}`}
                         </p>
                       </div>
-                      {!isEditing ? (
+
+                      {activeSection === "memory" ? (
+                        !isEditingMemory ? (
+                          <button
+                            className="h-[44px] shrink-0 rounded-2xl border border-[#cfd7e3] bg-white px-4 text-sm font-semibold text-[#0f172a] transition hover:border-[#bfc9d8] hover:bg-[#f9fbfd]"
+                            onClick={() => {
+                              setAnswers(savedAnswers);
+                              setIsEditingMemory(true);
+                              setError("");
+                              setSaveMessage("");
+                            }}
+                            type="button"
+                          >
+                            Edit
+                          </button>
+                        ) : null
+                      ) : addresses.length < 3 && !addressDraft ? (
                         <button
                           className="h-[44px] shrink-0 rounded-2xl border border-[#cfd7e3] bg-white px-4 text-sm font-semibold text-[#0f172a] transition hover:border-[#bfc9d8] hover:bg-[#f9fbfd]"
                           onClick={() => {
-                            setAnswers(savedAnswers);
-                            setIsEditing(true);
+                            setAddressDraft({ id: null, payload: { ...emptyAddress(), is_default: addresses.length === 0 } });
                             setError("");
                             setSaveMessage("");
                           }}
                           type="button"
                         >
-                          Edit
+                          Add address
                         </button>
                       ) : null}
                     </div>
 
-                    {!isEditing ? (
-                      hasAnyAnswer(savedAnswers) ? (
-                        questions.map((question, index) => {
-                          const value = savedAnswers[question.key];
-                          const displayValues = Array.isArray(value)
-                            ? value.map(prettifyAnswer)
-                            : typeof value === "string" && value.trim()
-                              ? value
-                                  .split("\n")
-                                  .map((item) => item.trim())
-                                  .filter(Boolean)
-                              : [];
+                    {activeSection === "memory" ? (
+                      !isEditingMemory ? (
+                        hasAnyAnswer(savedAnswers) ? (
+                          questions.map((question, index) => {
+                            const value = savedAnswers[question.key];
+                            const displayValues = Array.isArray(value)
+                              ? value.map(prettifyAnswer)
+                              : typeof value === "string" && value.trim()
+                                ? value
+                                    .split("\n")
+                                    .map((item) => item.trim())
+                                    .filter(Boolean)
+                                : [];
 
-                          return (
+                            return (
+                              <section
+                                className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.08)]"
+                                key={question.key}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#dbeafe_0%,#bfdbfe_100%)] text-sm font-bold text-[#1d4ed8]">
+                                    {index + 1}
+                                  </div>
+                                  <div className="w-full">
+                                    <p className="text-base font-semibold text-[#101828]">{question.question}</p>
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                      {displayValues.length > 0 ? (
+                                        displayValues.map((item) => (
+                                          <span
+                                            className="rounded-full bg-[#eef2ff] px-3 py-1.5 text-sm font-medium text-[#4338ca]"
+                                            key={`${question.key}-${item}`}
+                                          >
+                                            {item}
+                                          </span>
+                                        ))
+                                      ) : (
+                                        <span className="text-sm text-[#98a2b3]">No answer saved yet.</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </section>
+                            );
+                          })
+                        ) : (
+                          <div className="rounded-[28px] border border-dashed border-[#d4dce7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-12 text-center">
+                            <p className="text-lg font-semibold text-[#101828]">No saved answers yet</p>
+                            <p className="mt-2 text-sm leading-7 text-[#667085]">
+                              Click edit to set your long-term shopping preferences for the first time.
+                            </p>
+                          </div>
+                        )
+                      ) : (
+                        <>
+                          {questions.map((question, index) => (
                             <section
                               className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.08)]"
                               key={question.key}
@@ -273,133 +440,272 @@ export default function ProfilePage() {
                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#dbeafe_0%,#bfdbfe_100%)] text-sm font-bold text-[#1d4ed8]">
                                   {index + 1}
                                 </div>
-                                <div className="w-full">
+                                <div>
                                   <p className="text-base font-semibold text-[#101828]">{question.question}</p>
-                                  <div className="mt-4 flex flex-wrap gap-2">
-                                    {displayValues.length > 0 ? (
-                                      displayValues.map((item) => (
-                                        <span
-                                          className="rounded-full bg-[#eef2ff] px-3 py-1.5 text-sm font-medium text-[#4338ca]"
-                                          key={`${question.key}-${item}`}
-                                        >
-                                          {item}
-                                        </span>
-                                      ))
-                                    ) : (
-                                      <span className="text-sm text-[#98a2b3]">No answer saved yet.</span>
-                                    )}
-                                  </div>
+                                  <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[#8b97a8]">
+                                    {question.multi_select ? "Select all that apply" : "Select one option"}
+                                  </p>
                                 </div>
                               </div>
+
+                              <div className="mt-4">
+                                {question.type === "choice" ? (
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    {question.options.map((option) => {
+                                      const checked = question.multi_select
+                                        ? Array.isArray(answers[question.key]) && answers[question.key].includes(option)
+                                        : answers[question.key] === option;
+
+                                      return (
+                                        <label
+                                          className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                                            checked
+                                              ? "border-[#93c5fd] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] text-[#1d4ed8] shadow-[0_12px_28px_rgba(59,130,246,0.12)]"
+                                              : "border-[#dbe3ed] bg-[#f8fafc] text-[#475467] hover:border-[#c7d2e2] hover:bg-white"
+                                          }`}
+                                          key={option}
+                                        >
+                                          <span
+                                            className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
+                                              checked
+                                                ? "border-[#60a5fa] bg-[#2563eb] text-white"
+                                                : "border-[#c5d0dd] bg-white text-transparent"
+                                            }`}
+                                          >
+                                            ✓
+                                          </span>
+                                          <input
+                                            checked={checked}
+                                            className="sr-only"
+                                            name={question.key}
+                                            onChange={(event) =>
+                                              question.multi_select
+                                                ? setMultiValue(question.key, option, event.target.checked)
+                                                : setAnswers((current) => ({ ...current, [question.key]: option }))
+                                            }
+                                            type={question.multi_select ? "checkbox" : "radio"}
+                                          />
+                                          <span>{prettifyAnswer(option)}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <textarea
+                                    className="min-h-[128px] w-full rounded-[24px] border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#93c5fd] focus:shadow-[0_0_0_4px_rgba(147,197,253,0.18)]"
+                                    onChange={(event) =>
+                                      setAnswers((current) => ({ ...current, [question.key]: event.target.value }))
+                                    }
+                                    placeholder="Add one preference or constraint per line..."
+                                    value={typeof answers[question.key] === "string" ? answers[question.key] : ""}
+                                  />
+                                )}
+                              </div>
                             </section>
-                          );
-                        })
-                      ) : (
-                        <div className="rounded-[28px] border border-dashed border-[#d4dce7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-12 text-center">
-                          <p className="text-lg font-semibold text-[#101828]">No saved answers yet</p>
-                          <p className="mt-2 text-sm leading-7 text-[#667085]">
-                            Click edit to set your long-term shopping preferences for the first time.
-                          </p>
-                        </div>
+                          ))}
+
+                          <div className="flex justify-end gap-2 pt-2">
+                            <button
+                              className="h-[44px] rounded-2xl border border-[#d8dee8] bg-white px-4 text-sm font-semibold text-[#475467] transition hover:bg-[#f8fafc]"
+                              onClick={() => {
+                                setAnswers(savedAnswers);
+                                setIsEditingMemory(false);
+                                setError("");
+                                setSaveMessage("");
+                              }}
+                              type="button"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              className="h-[44px] rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.22)] transition hover:brightness-105 disabled:opacity-60"
+                              disabled={isSaving}
+                              onClick={handleSaveMemory}
+                              type="button"
+                            >
+                              {isSaving ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        </>
                       )
                     ) : (
                       <>
-                        {questions.map((question, index) => (
-                          <section
-                            className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.08)]"
-                            key={question.key}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#dbeafe_0%,#bfdbfe_100%)] text-sm font-bold text-[#1d4ed8]">
-                                {index + 1}
-                              </div>
+                        {addresses.length > 0 ? (
+                          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {addresses.map((address) => (
+                              <section
+                                className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.08)]"
+                                key={address.id}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-base font-semibold text-[#101828]">
+                                      {addressField(address.recipient_name)}
+                                    </p>
+                                    <p className="mt-1 text-sm text-[#667085]">{addressField(address.phone_number)}</p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {address.is_default ? (
+                                      <span className="rounded-full bg-[#eff6ff] px-2.5 py-1 text-xs font-semibold text-[#2563eb]">
+                                        Default
+                                      </span>
+                                    ) : null}
+                                    <button
+                                      className="rounded-2xl border border-[#d8dee8] bg-white px-3 py-2 text-xs font-semibold text-[#475467] transition hover:bg-[#f8fafc]"
+                                      onClick={() => {
+                                        const { id, ...payload } = address;
+                                        setAddressDraft({ id, payload });
+                                        setError("");
+                                        setSaveMessage("");
+                                      }}
+                                      type="button"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="mt-4 space-y-2 text-sm text-[#475467]">
+                                  <p>{formatAddressLine(address) || "Region not set"}</p>
+                                  <p>{addressField(address.street_line_1)}</p>
+                                  {address.street_line_2 ? <p>{address.street_line_2}</p> : null}
+                                  <p>{addressField(address.postal_code)}</p>
+                                  {address.delivery_notes ? <p>{address.delivery_notes}</p> : null}
+                                </div>
+                                {!address.is_default ? (
+                                  <button
+                                    className="mt-4 rounded-2xl border border-[#d8dee8] bg-white px-3 py-2 text-xs font-semibold text-[#0f172a] transition hover:border-[#bfc9d8] hover:bg-[#f9fbfd]"
+                                    onClick={() => void handleSetDefaultAddress(address.id)}
+                                    type="button"
+                                  >
+                                    Set as default
+                                  </button>
+                                ) : null}
+                              </section>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-[28px] border border-dashed border-[#d4dce7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-12 text-center">
+                            <p className="text-lg font-semibold text-[#101828]">No saved addresses yet</p>
+                            <p className="mt-2 text-sm leading-7 text-[#667085]">
+                              Add up to three shipping addresses and choose one as the default address for future orders.
+                            </p>
+                          </div>
+                        )}
+
+                        {addressDraft ? (
+                          <section className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">
+                            <div className="flex items-center justify-between gap-4">
                               <div>
-                                <p className="text-base font-semibold text-[#101828]">{question.question}</p>
-                                <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[#8b97a8]">
-                                  {question.multi_select ? "Select all that apply" : "Select one option"}
+                                <p className="text-base font-semibold text-[#101828]">
+                                  {addressDraft.id ? "Edit address" : "Add a new address"}
+                                </p>
+                                <p className="mt-1 text-sm text-[#667085]">
+                                  Save complete delivery details for shipping and logistics.
                                 </p>
                               </div>
+                              <label className="flex items-center gap-2 text-sm font-medium text-[#475467]">
+                                <input
+                                  checked={addressDraft.payload.is_default}
+                                  onChange={(event) =>
+                                    setAddressDraft((current) =>
+                                      current
+                                        ? { ...current, payload: { ...current.payload, is_default: event.target.checked } }
+                                        : current,
+                                    )
+                                  }
+                                  type="checkbox"
+                                />
+                                Default address
+                              </label>
                             </div>
 
-                            <div className="mt-4">
-                              {question.type === "choice" ? (
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                  {question.options.map((option) => {
-                                    const checked = question.multi_select
-                                      ? Array.isArray(answers[question.key]) &&
-                                        answers[question.key].includes(option)
-                                      : answers[question.key] === option;
-
-                                    return (
-                                      <label
-                                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-                                          checked
-                                            ? "border-[#93c5fd] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] text-[#1d4ed8] shadow-[0_12px_28px_rgba(59,130,246,0.12)]"
-                                            : "border-[#dbe3ed] bg-[#f8fafc] text-[#475467] hover:border-[#c7d2e2] hover:bg-white"
-                                        }`}
-                                        key={option}
-                                      >
-                                        <span
-                                          className={`flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
-                                            checked
-                                              ? "border-[#60a5fa] bg-[#2563eb] text-white"
-                                              : "border-[#c5d0dd] bg-white text-transparent"
-                                          }`}
-                                        >
-                                          ✓
-                                        </span>
-                                        <input
-                                          checked={checked}
-                                          className="sr-only"
-                                          name={question.key}
-                                          onChange={(event) =>
-                                            question.multi_select
-                                              ? setMultiValue(question.key, option, event.target.checked)
-                                              : setAnswers((current) => ({ ...current, [question.key]: option }))
-                                          }
-                                          type={question.multi_select ? "checkbox" : "radio"}
-                                        />
-                                        <span>{prettifyAnswer(option)}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
+                            <div className="mt-5 grid gap-4 md:grid-cols-2">
+                              {[
+                                ["recipient_name", "Recipient", "Full name"],
+                                ["phone_number", "Phone", "Phone number"],
+                                ["country", "Country", "Country"],
+                                ["province_state", "Province / State", "Province or state"],
+                                ["city", "City", "City"],
+                                ["district", "District", "District"],
+                                ["street_line_1", "Street line 1", "Street address"],
+                                ["street_line_2", "Street line 2", "Apartment, suite, etc. (optional)"],
+                                ["postal_code", "Postal code", "Postal code"],
+                              ].map(([key, label, placeholder]) => (
+                                <label
+                                  className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.08)]"
+                                  key={key}
+                                >
+                                  <span className="mb-3 block text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+                                    {label}
+                                  </span>
+                                  <input
+                                    className="h-12 w-full rounded-2xl border border-[#d7dee8] bg-white px-4 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#93c5fd] focus:shadow-[0_0_0_4px_rgba(147,197,253,0.18)]"
+                                    onChange={(event) =>
+                                      setAddressDraft((current) =>
+                                        current
+                                          ? {
+                                              ...current,
+                                              payload: {
+                                                ...current.payload,
+                                                [key]: event.target.value || null,
+                                              },
+                                            }
+                                          : current,
+                                      )
+                                    }
+                                    placeholder={placeholder}
+                                    value={(addressDraft.payload[key as keyof UserAddressPayload] as string | null) ?? ""}
+                                  />
+                                </label>
+                              ))}
+                              <label className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.08)] md:col-span-2">
+                                <span className="mb-3 block text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+                                  Delivery notes
+                                </span>
                                 <textarea
-                                  className="min-h-[128px] w-full rounded-[24px] border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#93c5fd] focus:shadow-[0_0_0_4px_rgba(147,197,253,0.18)]"
+                                  className="min-h-[120px] w-full rounded-[24px] border border-[#d7dee8] bg-white p-4 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#93c5fd] focus:shadow-[0_0_0_4px_rgba(147,197,253,0.18)]"
                                   onChange={(event) =>
-                                    setAnswers((current) => ({ ...current, [question.key]: event.target.value }))
+                                    setAddressDraft((current) =>
+                                      current
+                                        ? {
+                                            ...current,
+                                            payload: {
+                                              ...current.payload,
+                                              delivery_notes: event.target.value || null,
+                                            },
+                                          }
+                                        : current,
+                                    )
                                   }
-                                  placeholder="Add one preference or constraint per line..."
-                                  value={typeof answers[question.key] === "string" ? answers[question.key] : ""}
+                                  placeholder="Delivery notes, landmark, gate code, or other instructions..."
+                                  value={addressDraft.payload.delivery_notes ?? ""}
                                 />
-                              )}
+                              </label>
+                            </div>
+
+                            <div className="mt-5 flex justify-end gap-2">
+                              <button
+                                className="h-[44px] rounded-2xl border border-[#d8dee8] bg-white px-4 text-sm font-semibold text-[#475467] transition hover:bg-[#f8fafc]"
+                                onClick={() => {
+                                  setAddressDraft(null);
+                                  setError("");
+                                  setSaveMessage("");
+                                }}
+                                type="button"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="h-[44px] rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.22)] transition hover:brightness-105 disabled:opacity-60"
+                                disabled={isSaving}
+                                onClick={handleSaveAddress}
+                                type="button"
+                              >
+                                {isSaving ? "Saving..." : "Save"}
+                              </button>
                             </div>
                           </section>
-                        ))}
-
-                        <div className="flex justify-end gap-2 pt-2">
-                          <button
-                            className="h-[44px] rounded-2xl border border-[#d8dee8] bg-white px-4 text-sm font-semibold text-[#475467] transition hover:bg-[#f8fafc]"
-                            onClick={() => {
-                              setAnswers(savedAnswers);
-                              setIsEditing(false);
-                              setError("");
-                              setSaveMessage("");
-                            }}
-                            type="button"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            className="h-[44px] rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.22)] transition hover:brightness-105 disabled:opacity-60"
-                            disabled={isSaving}
-                            onClick={handleSave}
-                            type="button"
-                          >
-                            {isSaving ? "Saving..." : "Save"}
-                          </button>
-                        </div>
+                        ) : null}
                       </>
                     )}
 
@@ -416,24 +722,6 @@ export default function ProfilePage() {
                     ) : null}
                   </div>
                 )}
-
-                {!isLoading && !isAuthenticated ? (
-                  <div className="rounded-[28px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 shadow-[0_16px_40px_rgba(148,163,184,0.08)]">
-                    <p className="text-lg font-semibold text-[#101828]">Sign in to view your profile</p>
-                    <p className="mt-2 text-sm leading-7 text-[#667085]">
-                      This page stores personal shopping preferences, so it is only available after authentication.
-                    </p>
-                    <div className="mt-4">
-                      <button
-                        className="inline-flex h-[48px] items-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white"
-                        onClick={() => setAuthOpen(true)}
-                        type="button"
-                      >
-                        Sign in
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </section>
           </div>
@@ -442,24 +730,7 @@ export default function ProfilePage() {
 
       <AuthModal
         onAuthSuccess={async () => {
-          const token = readAccessToken();
-          if (!token) {
-            return;
-          }
-
-          const [currentUser, memory, onboardingQuestions] = await Promise.all([
-            fetchCurrentUser(token),
-            fetchMemoryProfile(),
-            fetchOnboardingQuestions(),
-          ]);
-
-          setUser(currentUser);
-          setIsAuthenticated(true);
-          setQuestions(onboardingQuestions);
-          const initialAnswers = buildAnswersFromProfile(memory.profile);
-          setAnswers(initialAnswers);
-          setSavedAnswers(initialAnswers);
-          setIsEditing(false);
+          await bootstrap();
           setError("");
           setSaveMessage("");
         }}

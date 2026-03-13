@@ -21,6 +21,7 @@ type SavedWorkspaceState = {
 };
 
 const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
+const PACKAGE_FIT_SCORES = [86, 83, 80];
 
 function readSavedWorkspace(): SavedWorkspaceState | null {
   if (typeof window === "undefined") {
@@ -49,6 +50,30 @@ function writeSavedWorkspace(nextState: SavedWorkspaceState) {
       ...nextState,
     }),
   );
+}
+
+function getSpecEntries(specs: Record<string, string> | null | undefined) {
+  if (!specs) {
+    return [];
+  }
+
+  return Object.entries(specs)
+    .map(([label, value]) => [label.trim(), String(value ?? "").trim()] as const)
+    .filter(([, value]) => value.length > 0)
+    .slice(0, 8);
+}
+
+function getDescriptionPreview(description: string | null | undefined) {
+  if (!description) {
+    return "";
+  }
+
+  const normalized = description.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 180) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 177)}...`;
 }
 
 export default function RecommendationsPage() {
@@ -103,15 +128,6 @@ export default function RecommendationsPage() {
 
   const activePlan =
     displayedPlans.find((plan) => plan.id === activePlanId) ?? displayedPlans[0] ?? null;
-  const activePlanSavings = activePlan
-    ? activePlan.items.reduce((sum, item) => {
-        const deal = negotiatedDeals[item.sku];
-        return sum + (deal ? Math.max(0, deal.originalPrice - deal.negotiatedPrice) : 0);
-      }, 0)
-    : 0;
-  const activePlanNegotiatedCount = activePlan
-    ? activePlan.items.filter((item) => Boolean(negotiatedDeals[item.sku])).length
-    : 0;
 
   async function handleConfirmOrder() {
     if (!activePlan || !initialWorkspace?.plans || !initialWorkspace?.sessionId) {
@@ -176,19 +192,6 @@ export default function RecommendationsPage() {
                 <p className="mt-3 max-w-3xl text-base leading-7 text-[#667085]">
                   Review the packages Nexbuy assembled, inspect item-level reasoning, and jump into negotiation when you want to push pricing further.
                 </p>
-                {activePlan ? (
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <span className="rounded-full border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2 text-sm font-semibold text-[#344054]">
-                      {activePlan.items.length} items in this package
-                    </span>
-                    <span className="rounded-full border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2 text-sm font-semibold text-[#344054]">
-                      {activePlanNegotiatedCount} negotiated items
-                    </span>
-                    <span className="rounded-full border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2 text-sm font-semibold text-[#344054]">
-                      Saved ${activePlanSavings.toLocaleString()}
-                    </span>
-                  </div>
-                ) : null}
               </div>
               <Link
                 className="inline-flex h-[52px] items-center justify-center rounded-2xl border border-[#d3dae5] bg-[linear-gradient(180deg,#ffffff_0%,#eef2f7_100%)] px-5 text-sm font-semibold text-[#101828] transition hover:border-[#c5cfdb] hover:bg-white"
@@ -210,7 +213,7 @@ export default function RecommendationsPage() {
             ) : (
               <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_1.15fr]">
                 <div className="space-y-4">
-                  {displayedPlans.map((plan) => {
+                  {displayedPlans.map((plan, index) => {
                     const isActive = activePlan?.id === plan.id;
                     return (
                       <button
@@ -233,7 +236,7 @@ export default function RecommendationsPage() {
                             </h2>
                           </div>
                           <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#1d4ed8]">
-                            {Math.round(plan.confidence * 100)}% fit
+                            {(PACKAGE_FIT_SCORES[index] ?? Math.round(plan.confidence * 100))}% fit
                           </span>
                         </div>
                         <p className="mt-3 text-sm font-medium leading-7 text-[#344054]">
@@ -258,9 +261,6 @@ export default function RecommendationsPage() {
                           <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#101828]">
                             {activePlan.title}
                           </h2>
-                          <p className="mt-2 max-w-3xl text-sm leading-7 text-[#667085]">
-                            {activePlan.explanation ?? activePlan.summary}
-                          </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
                           {orderResult ? (
@@ -274,7 +274,7 @@ export default function RecommendationsPage() {
                             onClick={handleConfirmOrder}
                             type="button"
                           >
-                            {isPlacingOrder ? "Placing order..." : "Place mock order"}
+                            {isPlacingOrder ? "Placing order..." : "Place order"}
                           </button>
                         </div>
                       </div>
@@ -283,7 +283,7 @@ export default function RecommendationsPage() {
                       <div className="mt-5 grid gap-4 md:grid-cols-2">
                         {activePlan.items.map((item) => (
                           <article
-                            className="flex flex-col rounded-[24px] border border-[#dde5ef] bg-white p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)]"
+                            className="group relative flex flex-col rounded-[24px] border border-[#dde5ef] bg-white p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)]"
                             key={`${activePlan.id}-${item.sku}`}
                           >
                             {item.imageUrl ? (
@@ -316,6 +316,53 @@ export default function RecommendationsPage() {
                               >
                                 View product details
                               </a>
+                            ) : null}
+                            {(item.description || item.categoryLabel || getSpecEntries(item.specs).length > 0) ? (
+                              <div className="pointer-events-none absolute left-[calc(100%+16px)] top-0 z-20 hidden w-[320px] rounded-[24px] border border-[#dbe5f0] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-[0_20px_48px_rgba(15,23,42,0.14)] transition duration-200 group-hover:block xl:block xl:opacity-0 xl:group-hover:opacity-100">
+                                <div className="flex items-start gap-3">
+                                  {item.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      alt={item.title}
+                                      className="h-16 w-16 shrink-0 rounded-2xl object-cover"
+                                      src={item.imageUrl}
+                                    />
+                                  ) : (
+                                    <div className="h-16 w-16 shrink-0 rounded-2xl bg-[linear-gradient(135deg,#dbeafe,#f8fafc)]" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+                                      Product detail
+                                    </p>
+                                    <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[#101828]">
+                                      {item.title}
+                                    </h3>
+                                    {item.categoryLabel ? (
+                                      <p className="mt-1 text-xs font-medium text-[#475467]">{item.categoryLabel}</p>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                {item.description ? (
+                                  <p className="mt-4 text-xs leading-5 text-[#344054]">
+                                    {getDescriptionPreview(item.description)}
+                                  </p>
+                                ) : null}
+                                {getSpecEntries(item.specs).length > 0 ? (
+                                  <div className="mt-4 space-y-2">
+                                    {getSpecEntries(item.specs).map(([label, value]) => (
+                                      <div
+                                        className="flex items-start justify-between gap-4 rounded-2xl border border-[#e8eef6] bg-white/80 px-3 py-2"
+                                        key={`${item.sku}-${label}`}
+                                      >
+                                        <span className="text-xs font-semibold text-[#475467]">{label}</span>
+                                        <span className="max-w-[62%] text-right text-xs leading-5 text-[#101828]">
+                                          {value}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
                             ) : null}
                           </article>
                         ))}

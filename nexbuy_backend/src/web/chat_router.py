@@ -88,6 +88,19 @@ def _build_bundle_items(products: list[Any], analysis: Any) -> tuple[list[dict[s
                     "reason": f"Matched target item: {category}.",
                     "imageUrl": p.main_image_url,
                     "productUrl": p.product_url,
+                    "description": getattr(p, "description_text", None),
+                    "categoryLabel": " / ".join(
+                        [
+                            part
+                            for part in [
+                                getattr(p, "category_name_2", None),
+                                getattr(p, "category_name_3", None),
+                            ]
+                            if part
+                        ]
+                    )
+                    or None,
+                    "specs": getattr(p, "specs", None),
                 }
             )
             used_skus.add(sku)
@@ -111,6 +124,19 @@ def _build_bundle_items(products: list[Any], analysis: Any) -> tuple[list[dict[s
                     "reason": "Top-ranked product from current query.",
                     "imageUrl": p.main_image_url,
                     "productUrl": p.product_url,
+                    "description": getattr(p, "description_text", None),
+                    "categoryLabel": " / ".join(
+                        [
+                            part
+                            for part in [
+                                getattr(p, "category_name_2", None),
+                                getattr(p, "category_name_3", None),
+                            ]
+                            if part
+                        ]
+                    )
+                    or None,
+                    "specs": getattr(p, "specs", None),
                 }
             )
 
@@ -424,6 +450,19 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                                     "reason": sel.reason or "Selected by AI bundle ranking.",
                                     "imageUrl": p.main_image_url,
                                     "productUrl": p.product_url,
+                                    "description": getattr(p, "description_text", None),
+                                    "categoryLabel": " / ".join(
+                                        [
+                                            part
+                                            for part in [
+                                                getattr(p, "category_name_2", None),
+                                                getattr(p, "category_name_3", None),
+                                            ]
+                                            if part
+                                        ]
+                                    )
+                                    or None,
+                                    "specs": getattr(p, "specs", None),
                                 }
                             )
                         if not bundle_items:

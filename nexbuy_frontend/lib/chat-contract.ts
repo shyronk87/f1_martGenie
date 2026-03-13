@@ -31,6 +31,9 @@ export type PlanItem = {
   reason: string;
   imageUrl?: string | null;
   productUrl?: string | null;
+  description?: string | null;
+  categoryLabel?: string | null;
+  specs?: Record<string, string> | null;
 };
 
 export type PlanOption = {

@@ -106,6 +106,7 @@ def _build_query(filters: QueryFilters) -> tuple[str, dict[str, Any]]:
                     sku_id_default,
                     spu_id,
                     title,
+                    description_text,
                     category_name_1,
                     category_name_2,
                     category_name_3,
@@ -115,9 +116,8 @@ def _build_query(filters: QueryFilters) -> tuple[str, dict[str, Any]]:
                     stock_status_text,
                     main_image_url,
                     product_url,
-                    review_count,
-                    description_text,
                     specs,
+                    review_count,
                     search_text,
                     (1 - (embedding <=> CAST(:query_vector AS vector))) AS semantic_score
                 FROM homary_products
@@ -129,6 +129,7 @@ def _build_query(filters: QueryFilters) -> tuple[str, dict[str, Any]]:
                 sku_id_default,
                 spu_id,
                 title,
+                description_text,
                 category_name_1,
                 category_name_2,
                 category_name_3,
@@ -138,6 +139,7 @@ def _build_query(filters: QueryFilters) -> tuple[str, dict[str, Any]]:
                 stock_status_text,
                 main_image_url,
                 product_url,
+                specs,
                 semantic_score,
                 ({keyword_score_sql}) AS keyword_score,
                 (
@@ -161,6 +163,7 @@ def _build_query(filters: QueryFilters) -> tuple[str, dict[str, Any]]:
             sku_id_default,
             spu_id,
             title,
+            description_text,
             category_name_1,
             category_name_2,
             category_name_3,
@@ -170,6 +173,7 @@ def _build_query(filters: QueryFilters) -> tuple[str, dict[str, Any]]:
             stock_status_text,
             main_image_url,
             product_url,
+            specs,
             NULL::double precision AS semantic_score,
             ({keyword_score_sql}) AS keyword_score,
             ({keyword_score_sql})::double precision AS final_score
@@ -191,4 +195,3 @@ async def query_products(filters: QueryFilters) -> list[ProductRow]:
     async with async_session_maker() as session:
         rows = (await session.execute(stmt, params)).mappings().all()
     return [ProductRow(**dict(row)) for row in rows]
-

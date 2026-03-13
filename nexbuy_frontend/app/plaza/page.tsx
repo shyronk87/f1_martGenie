@@ -185,30 +185,31 @@ export default function PlazaPage() {
     [],
   );
 
-  function renderRecommendationCard(product: PlazaRecommendationProduct) {
+function renderRecommendationCard(product: PlazaRecommendationProduct) {
     return (
       <article
-        className="overflow-hidden rounded-[24px] border border-[#ece7df] bg-white shadow-[0_10px_24px_rgba(24,24,27,0.04)]"
+        className="group overflow-hidden rounded-[28px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.14)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.16)]"
         key={product.sku_id_default}
       >
-        <div className="h-56 bg-[#f4f4f5]">
+        <div className="relative h-56 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
           {product.main_image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img alt={product.title} className="h-full w-full object-cover" src={product.main_image_url} />
+            <img alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" src={product.main_image_url} />
           ) : null}
         </div>
-        <div className="p-4">
-          <h3 className="text-base font-bold leading-6 text-[#27272a]">{product.title}</h3>
-          <p className="mt-3 text-sm leading-6 text-[#5f564d]">{product.recommendation_reason}</p>
-          <p className="mt-4 text-lg font-black text-[#18181b]">{formatMoney(product.sale_price ?? 0)}</p>
+        <div className="p-5">
+          <h3 className="text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">{product.title}</h3>
+          <p className="mt-3 text-sm leading-7 text-[#475467]">{product.recommendation_reason}</p>
+          <p className="mt-5 text-xl font-black tracking-[-0.03em] text-[#0f172a]">{formatMoney(product.sale_price ?? 0)}</p>
         </div>
       </article>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#f5f5f4] text-[#18181b]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(216,180,254,0.12),transparent_24%),radial-gradient(circle_at_85%_10%,rgba(187,247,208,0.16),transparent_18%),linear-gradient(180deg,#fbfbfb_0%,#f3f4f6_100%)]" />
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f7fafc_0%,#edf3f9_44%,#e7eef7_100%)] text-[#0f172a]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.32),transparent_24%),radial-gradient(circle_at_82%_12%,rgba(148,163,184,0.18),transparent_18%),radial-gradient(circle_at_bottom_right,rgba(125,211,252,0.16),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.68)_0%,rgba(241,245,249,0.18)_100%)]" />
       <div className="relative">
         <Navbar
           isAuthenticated={isAuthenticated}
@@ -222,24 +223,25 @@ export default function PlazaPage() {
         />
 
         <section className="mx-auto max-w-[1380px] px-6 pb-16 pt-28">
-          <div className="rounded-[36px] border border-[#e8e5df] bg-white/92 p-8 shadow-[0_24px_80px_rgba(24,24,27,0.06)] md:p-10">
+          <div className="rounded-[40px] border border-[#dce5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(245,249,253,0.9)_100%)] p-8 shadow-[0_32px_90px_rgba(148,163,184,0.16)] backdrop-blur-xl md:p-10">
             {error ? (
               <div className="rounded-[24px] border border-[#fecaca] bg-[#fff1f2] px-5 py-4 text-sm font-medium text-[#b42318]">
                 {error}
               </div>
             ) : null}
 
-            <div className={error ? "mt-10 rounded-[30px] border border-[#ebe7df] bg-[#fcfcfb] p-6 md:p-8" : "rounded-[30px] border border-[#ebe7df] bg-[#fcfcfb] p-6 md:p-8"}>
+            <div className={error ? "mt-10 rounded-[34px] border border-[#dbe5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(243,247,251,0.88)_100%)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] md:p-8" : "rounded-[34px] border border-[#dbe5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(243,247,251,0.88)_100%)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] md:p-8"}>
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <h2 className="text-5xl font-black tracking-[0.04em] text-[#8f5b18] md:text-6xl">
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.38em] text-[#7c8da5]">Personalized picks</p>
+                  <h2 className="mt-3 text-5xl font-black tracking-[-0.05em] text-[#0f172a] md:text-6xl">
                     Recommended For You
                   </h2>
                 </div>
               </div>
 
               {recommendationError ? (
-                <div className="mt-6 rounded-[22px] border border-[#fecaca] bg-[#fff1f2] px-5 py-4 text-sm font-medium text-[#b42318]">
+                <div className="mt-6 rounded-[24px] border border-[#fecaca] bg-[#fff1f2] px-5 py-4 text-sm font-medium text-[#b42318]">
                   {recommendationError}
                 </div>
               ) : null}
@@ -248,16 +250,16 @@ export default function PlazaPage() {
                 <div className="mt-8 space-y-8">
                   {Array.from({ length: 4 }).map((_, groupIndex) => (
                     <section key={groupIndex}>
-                      <div className="h-6 w-40 animate-pulse rounded bg-[#f1f0eb]" />
+                      <div className="h-6 w-40 animate-pulse rounded bg-[#e2e8f0]" />
                       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {Array.from({ length: 4 }).map((__, cardIndex) => (
-                          <div className="overflow-hidden rounded-[24px] border border-[#ece7df] bg-white" key={`${groupIndex}-${cardIndex}`}>
-                            <div className="h-56 animate-pulse bg-[#f4f4f5]" />
+                          <div className="overflow-hidden rounded-[24px] border border-[#dce5ef] bg-white/90" key={`${groupIndex}-${cardIndex}`}>
+                            <div className="h-56 animate-pulse bg-[#e2e8f0]" />
                             <div className="space-y-3 p-4">
-                              <div className="h-3 w-24 animate-pulse rounded bg-[#f1f0eb]" />
-                              <div className="h-6 w-full animate-pulse rounded bg-[#f1f0eb]" />
-                              <div className="h-4 w-full animate-pulse rounded bg-[#f1f0eb]" />
-                              <div className="h-4 w-2/3 animate-pulse rounded bg-[#f1f0eb]" />
+                              <div className="h-3 w-24 animate-pulse rounded bg-[#e2e8f0]" />
+                              <div className="h-6 w-full animate-pulse rounded bg-[#e2e8f0]" />
+                              <div className="h-4 w-full animate-pulse rounded bg-[#e2e8f0]" />
+                              <div className="h-4 w-2/3 animate-pulse rounded bg-[#e2e8f0]" />
                             </div>
                           </div>
                         ))}
@@ -268,13 +270,13 @@ export default function PlazaPage() {
               ) : null}
 
               {!isLoadingRecommendations && isAuthenticated && recommendations?.onboarding_required ? (
-                <div className="mt-8 rounded-[24px] border border-dashed border-[#d8d1c8] bg-white px-6 py-10 text-center text-sm text-[#6b645c]">
+                <div className="mt-8 rounded-[28px] border border-dashed border-[#c9d5e3] bg-[linear-gradient(180deg,#ffffff_0%,#f7fafc_100%)] px-6 py-10 text-center text-sm text-[#667085]">
                   Your account is signed in, but the memory profile is still empty. Complete onboarding to get tailored product picks here.
                 </div>
               ) : null}
 
               {!isLoadingRecommendations && !isAuthenticated ? (
-                <div className="mt-8 rounded-[24px] border border-dashed border-[#d8d1c8] bg-white px-6 py-10 text-center text-sm text-[#6b645c]">
+                <div className="mt-8 rounded-[28px] border border-dashed border-[#c9d5e3] bg-[linear-gradient(180deg,#ffffff_0%,#f7fafc_100%)] px-6 py-10 text-center text-sm text-[#667085]">
                   Sign in to load recommendations based on your saved style, room, household, and budget preferences.
                 </div>
               ) : null}
@@ -284,7 +286,10 @@ export default function PlazaPage() {
                   {recommendationGroups.map((group) => (
                     <section key={group.label}>
                       <div className="flex items-center gap-4">
-                        <h3 className="text-2xl font-black tracking-[-0.04em] text-[#18110a]">{group.label}</h3>
+                        <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#dbe5ef] bg-[linear-gradient(180deg,#ffffff_0%,#eef3f8_100%)] text-sm font-black text-[#4b6b92]">
+                          {group.label.slice(0, 1)}
+                        </div>
+                        <h3 className="text-2xl font-black tracking-[-0.04em] text-[#0f172a]">{group.label}</h3>
                       </div>
                       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {group.products.map((product) => renderRecommendationCard(product))}
@@ -296,8 +301,8 @@ export default function PlazaPage() {
             </div>
 
             <div className="mt-10">
-              <div className="inline-flex items-center gap-3 rounded-full bg-[#fff5e8] px-4 py-2 text-sm font-bold text-[#8f5b18]">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#ffb84d] text-white">↗</span>
+              <div className="inline-flex items-center gap-3 rounded-full border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#edf3f8_100%)] px-4 py-2 text-sm font-bold text-[#3f5f87] shadow-[0_12px_26px_rgba(148,163,184,0.1)]">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(180deg,#bfdbfe_0%,#60a5fa_100%)] text-white">↗</span>
                 Agent Wins
               </div>
 
@@ -308,10 +313,10 @@ export default function PlazaPage() {
                   const shopperInitial = (showcase.user_display_masked || "A").slice(0, 1).toUpperCase();
                   return (
                     <button
-                      className={`group rounded-[28px] border p-5 text-left shadow-[0_12px_30px_rgba(24,24,27,0.04)] transition ${
+                      className={`group rounded-[30px] border p-5 text-left shadow-[0_18px_45px_rgba(148,163,184,0.12)] transition duration-300 ${
                         isActive
-                          ? "border-[#d6ccff] bg-[#fcfbff]"
-                          : "border-[#ece7df] bg-white hover:-translate-y-1 hover:border-[#ddd6fe]"
+                          ? "border-[#bfd3ea] bg-[linear-gradient(180deg,#f8fbff_0%,#edf4fb_100%)]"
+                          : "border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.14)]"
                       }`}
                       key={showcase.id}
                       onClick={() => void handleSelectShowcase(showcase.id)}
@@ -323,28 +328,28 @@ export default function PlazaPage() {
                             {shopperInitial}
                           </div>
                           <div>
-                            <p className="text-base font-bold text-[#27272a]">{buildAgentLabel(showcase)}</p>
-                            <p className="text-sm text-[#71717a]">{formatRelativeTime(showcase.approved_at)}</p>
+                            <p className="text-base font-bold text-[#0f172a]">{buildAgentLabel(showcase)}</p>
+                            <p className="text-sm text-[#667085]">{formatRelativeTime(showcase.approved_at)}</p>
                           </div>
                         </div>
                         <span className={`rounded-full px-3 py-1 text-xs font-bold ${badge.className}`}>{badge.label}</span>
                       </div>
 
-                      <p className="mt-5 text-base leading-7 text-[#3f3f46]">
+                      <p className="mt-5 text-base leading-7 text-[#475467]">
                         {showcase.summary ?? `${buildAgentLabel(showcase)} closed a lower-price package.`}
                       </p>
-                      <p className="mt-1 text-base font-black text-[#22a06b]">
+                      <p className="mt-2 text-lg font-black tracking-[-0.03em] text-[#2563eb]">
                         saved {formatMoney(showcase.total_saved_amount, showcase.currency_symbol)}
                       </p>
 
-                      <div className="mt-5 rounded-[22px] bg-[#f8fafc] p-4">
+                      <div className="mt-5 rounded-[24px] border border-[#dce5ef] bg-[linear-gradient(180deg,#f9fbfd_0%,#eef3f8_100%)] p-4">
                         <div className="flex items-center gap-3">
-                          <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#ede9fe] text-[#7c6df9]">
+                          <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#dce5ef] bg-white text-[#4b6b92]">
                             ✣
                           </div>
                           <div>
-                            <p className="font-bold text-[#27272a]">{buildCollectionLabel(showcase)}</p>
-                            <p className="text-sm text-[#71717a]">
+                            <p className="font-bold text-[#0f172a]">{buildCollectionLabel(showcase)}</p>
+                            <p className="text-sm text-[#667085]">
                               {selectedShowcase?.id === showcase.id
                                 ? buildCollectionTone(selectedShowcase)
                                 : `Curated set ${index + 1}`}
@@ -353,7 +358,7 @@ export default function PlazaPage() {
                         </div>
                       </div>
 
-                      <div className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#eef2ff] px-4 py-3 text-sm font-bold text-[#5b53d8] transition group-hover:bg-[#e4e7ff]">
+                      <div className="mt-5 inline-flex w-full items-center justify-center rounded-2xl border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#eef3f8_100%)] px-4 py-3 text-sm font-bold text-[#3f5f87] transition group-hover:border-[#bfd3ea] group-hover:bg-[linear-gradient(180deg,#f8fbff_0%,#eaf1f8_100%)]">
                         View Package Story →
                       </div>
                     </button>
@@ -362,27 +367,27 @@ export default function PlazaPage() {
               </div>
 
               {!isBootstrapping && selectedShowcase ? (
-                <div className="mt-10 rounded-[30px] border border-[#ebe7df] bg-[#fcfcfb] p-6 md:p-8">
+                <div className="mt-10 rounded-[34px] border border-[#dbe5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(243,247,251,0.92)_100%)] p-6 shadow-[0_24px_60px_rgba(148,163,184,0.14)] md:p-8">
                   <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                     <div className="max-w-2xl">
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8f5b18]">Selected Package</p>
-                      <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[#18110a]">
+                      <p className="font-mono text-[11px] font-bold uppercase tracking-[0.34em] text-[#7c8da5]">Selected package</p>
+                      <h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#0f172a]">
                         {selectedShowcase.bundle_name}
                       </h2>
-                      <p className="mt-4 text-base leading-7 text-[#5f564d]">{selectedShowcase.summary}</p>
+                      <p className="mt-4 text-base leading-8 text-[#475467]">{selectedShowcase.summary}</p>
                     </div>
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-[22px] border border-[#ebe7df] bg-white px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8b8177]">Original</p>
-                        <p className="mt-2 text-xl font-black">{formatMoney(selectedShowcase.total_original_price)}</p>
+                      <div className="rounded-[24px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] px-4 py-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#7c8da5]">Original</p>
+                        <p className="mt-2 text-xl font-black text-[#0f172a]">{formatMoney(selectedShowcase.total_original_price)}</p>
                       </div>
-                      <div className="rounded-[22px] border border-[#ebe7df] bg-white px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8b8177]">Final</p>
-                        <p className="mt-2 text-xl font-black">{formatMoney(selectedShowcase.total_final_price)}</p>
+                      <div className="rounded-[24px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] px-4 py-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#7c8da5]">Final</p>
+                        <p className="mt-2 text-xl font-black text-[#0f172a]">{formatMoney(selectedShowcase.total_final_price)}</p>
                       </div>
-                      <div className="rounded-[22px] border border-[#d4f5df] bg-[#f2fff6] px-4 py-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#1d8f57]">Saved</p>
-                        <p className="mt-2 text-xl font-black text-[#17995b]">
+                      <div className="rounded-[24px] border border-[#bfdbfe] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] px-4 py-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2563eb]">Saved</p>
+                        <p className="mt-2 text-xl font-black text-[#1d4ed8]">
                           {formatMoney(selectedShowcase.total_saved_amount)}
                         </p>
                       </div>
@@ -391,25 +396,25 @@ export default function PlazaPage() {
 
                   <div className="mt-8 grid gap-4 md:grid-cols-3">
                     {selectedShowcase.items.map((item) => (
-                      <article className="overflow-hidden rounded-[24px] border border-[#ece7df] bg-white" key={item.sku_id_default}>
-                        <div className="h-52 bg-[#f4f4f5]">
+                      <article className="overflow-hidden rounded-[28px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] shadow-[0_16px_40px_rgba(148,163,184,0.12)]" key={item.sku_id_default}>
+                        <div className="h-52 bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
                           {item.main_image_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img alt={item.title} className="h-full w-full object-cover" src={item.main_image_url} />
                           ) : null}
                         </div>
-                        <div className="p-4">
-                          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8b8177]">
+                        <div className="p-5">
+                          <p className="font-mono text-[11px] font-bold uppercase tracking-[0.28em] text-[#7c8da5]">
                             {[item.category_name_2, item.category_name_3].filter(Boolean).join(" / ") || item.category_name_1 || "Product"}
                           </p>
-                          <h3 className="mt-2 text-base font-bold leading-6 text-[#27272a]">{item.title}</h3>
+                          <h3 className="mt-3 text-base font-bold leading-7 text-[#0f172a]">{item.title}</h3>
                           <div className="mt-4 flex items-center justify-between text-sm">
-                            <span className="text-[#71717a]">Final</span>
-                            <span className="font-bold text-[#27272a]">{formatMoney(item.final_price_used)}</span>
+                            <span className="text-[#667085]">Final</span>
+                            <span className="font-bold text-[#0f172a]">{formatMoney(item.final_price_used)}</span>
                           </div>
                           <div className="mt-2 flex items-center justify-between text-sm">
-                            <span className="text-[#71717a]">Saved</span>
-                            <span className="font-bold text-[#22a06b]">{formatMoney(item.saved_amount)}</span>
+                            <span className="text-[#667085]">Saved</span>
+                            <span className="font-bold text-[#2563eb]">{formatMoney(item.saved_amount)}</span>
                           </div>
                         </div>
                       </article>

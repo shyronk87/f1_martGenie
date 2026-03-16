@@ -35,6 +35,7 @@ const NAV_ITEMS = [
   { label: "Packages", href: "/recommendations" },
   { label: "Negotiation", href: "/negotiation" },
   { label: "Plaza", href: "/plaza" },
+  { label: "Seller", href: "/seller-console" },
   { label: "Home", href: "/" },
 ];
 

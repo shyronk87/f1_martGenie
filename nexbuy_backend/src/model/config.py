@@ -7,8 +7,8 @@ class ModelSettings(BaseSettings):
     glm_embedding_model_name: str = "embedding-3"
     glm_embedding_dim: int = 2048
     glm_api_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
-    llm_analysis_provider: str = "glm"
-    llm_analysis_model: str = "glm-4.7"
+    llm_analysis_provider: str = "openrouter"
+    llm_analysis_model: str = "qwen/qwen3-30b-a3b"
     llm_analysis_timeout_seconds: int = 90
     llm_bundle_provider: str = "openrouter"
     llm_bundle_model: str = "minimax/minimax-m2.5"

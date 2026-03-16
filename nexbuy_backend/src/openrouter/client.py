@@ -68,7 +68,10 @@ class OpenRouterClient:
                 headers=headers,
                 json=payload,
             )
-            response.raise_for_status()
+            if response.is_error:
+                raise RuntimeError(
+                    f"OpenRouter error {response.status_code}: {response.text}"
+                )
             data = response.json()
 
         choices = data.get("choices") or []

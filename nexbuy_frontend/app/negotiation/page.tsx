@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
@@ -656,12 +655,6 @@ export default function NegotiationPage() {
               >
                 Buyer Agent
               </button>
-              <Link
-                className="rounded-full border border-[#d7e1ec] bg-white px-3 py-1 text-xs font-semibold text-[#344054] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
-                href="/recommendations"
-              >
-                Back to packages
-              </Link>
             </div>
           </div>
 

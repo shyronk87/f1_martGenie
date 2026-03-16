@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
@@ -571,12 +570,6 @@ export default function ChatWorkspacePage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#0f766e]">Live buying workflow</p>
                 <h1 className="mt-2 text-xl font-semibold tracking-tight text-[#101828] md:text-2xl">Agent Shopping Assistant</h1>
               </div>
-              <Link
-                className="rounded-full border border-[#d2dae5] bg-white px-4 py-2 text-sm font-medium text-[#344054] transition hover:border-[#bcc7d6] hover:bg-[#f8fafc]"
-                href="/"
-              >
-                Back
-              </Link>
             </div>
 
             <div

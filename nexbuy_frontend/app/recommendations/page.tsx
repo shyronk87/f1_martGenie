@@ -195,7 +195,7 @@ export default function RecommendationsPage() {
       >
         <section className="mx-auto max-w-[1480px] px-6 py-10">
           <div className="rounded-[36px] border border-[#dde4ed] bg-white/90 p-8 shadow-[0_24px_80px_rgba(148,163,184,0.12)] backdrop-blur-xl md:p-10">
-            <div className="flex flex-col gap-4 border-b border-[#e4e9f0] pb-6 md:flex-row md:items-end md:justify-between">
+            <div className="border-b border-[#e4e9f0] pb-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8b97a8]">
                   Packages
@@ -207,12 +207,6 @@ export default function RecommendationsPage() {
                   Review the packages Nexbuy assembled, inspect item-level reasoning, and jump into negotiation when you want to push pricing further.
                 </p>
               </div>
-              <Link
-                className="inline-flex h-[52px] items-center justify-center rounded-2xl border border-[#d3dae5] bg-[linear-gradient(180deg,#ffffff_0%,#eef2f7_100%)] px-5 text-sm font-semibold text-[#101828] transition hover:border-[#c5cfdb] hover:bg-white"
-                href="/chat"
-              >
-                Back to chat
-              </Link>
             </div>
 
             {displayedPlans.length === 0 ? (

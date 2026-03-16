@@ -154,6 +154,10 @@ export default function NegotiationPage() {
     acceptedPrice && Number.isFinite(originalPrice) && originalPrice > acceptedPrice
       ? originalPrice - acceptedPrice
       : 0;
+  const acceptedSellerMessageId =
+    acceptedPrice != null
+      ? [...messages].reverse().find((message) => message.role === "seller" && !message.pending)?.id ?? null
+      : null;
 
   function applyStoredRun(stored: ReturnType<typeof readNegotiationRuns>[string]) {
     setMode("agent");
@@ -727,6 +731,15 @@ export default function NegotiationPage() {
                       {message.meta}
                     </p>
                   ) : null}
+                  {message.id === acceptedSellerMessageId ? (
+                    <button
+                      className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.16)] transition hover:brightness-105"
+                      onClick={handleProceedToOrder}
+                      type="button"
+                    >
+                      Place order
+                    </button>
+                  ) : null}
                 </article>
               ))
             )}
@@ -817,15 +830,6 @@ export default function NegotiationPage() {
                   {agentResult.final_price ? ` | Final price: ${agentResult.final_price.toLocaleString()}` : ""}
                 </p>
               ) : null}
-              {acceptedPrice != null ? (
-                <button
-                  className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.16)] transition hover:brightness-105"
-                  onClick={handleProceedToOrder}
-                  type="button"
-                >
-                  Proceed to order
-                </button>
-              ) : null}
               {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
             </div>
           )}
@@ -870,15 +874,6 @@ export default function NegotiationPage() {
                     ? "Closed without accepted price"
                     : "Open"}
               </p>
-              {acceptedPrice != null ? (
-                <button
-                  className="mt-4 inline-flex h-11 items-center justify-center rounded-full border border-[#cdd9e7] bg-white px-5 text-sm font-semibold text-[#101828] transition hover:border-[#bed0e5] hover:bg-[#f8fbff]"
-                  onClick={handleProceedToOrder}
-                  type="button"
-                >
-                  Place order
-                </button>
-              ) : null}
             </div>
           ) : null}
 

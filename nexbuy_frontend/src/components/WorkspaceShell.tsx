@@ -1,6 +1,7 @@
 "use client";
 
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
+import { fetchChatHistory } from "@/lib/chat-api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +16,7 @@ import {
 type WorkspaceShellProps = {
   currentPath: string;
   isAuthenticated: boolean;
+  currentSessionId?: string | null;
   onOpenAuth: () => void;
   onSignOut: () => void;
   onNewConversation?: () => void;
@@ -127,6 +129,7 @@ function getWorkspacePreviewSnapshot() {
 export default function WorkspaceShell({
   currentPath,
   isAuthenticated,
+  currentSessionId,
   onOpenAuth,
   onSignOut,
   onNewConversation,
@@ -136,6 +139,7 @@ export default function WorkspaceShell({
   const [selectedHistoryId, setSelectedHistoryId] = useState("current");
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [remoteHistoryItems, setRemoteHistoryItems] = useState<HistoryItem[]>([]);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
   const workspacePreviewSnapshot = useSyncExternalStore(
     subscribeWorkspacePreview,
@@ -156,9 +160,9 @@ export default function WorkspaceShell({
         preview: workspacePreview.preview,
         href: "/chat",
       },
-      ...HISTORY_PRESETS,
+      ...(isAuthenticated ? remoteHistoryItems : HISTORY_PRESETS),
     ],
-    [workspacePreview.preview, workspacePreview.title],
+    [isAuthenticated, remoteHistoryItems, workspacePreview.preview, workspacePreview.title],
   );
 
   useEffect(() => {
@@ -175,6 +179,28 @@ export default function WorkspaceShell({
       .then((user) => setUserEmail(user.email))
       .catch(() => clearAccessToken());
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    void fetchChatHistory()
+      .then((sessions) =>
+        setRemoteHistoryItems(
+          sessions.map((session) => ({
+            id: session.session_id,
+            title: session.title,
+            time: new Date(session.updated_at).toLocaleDateString(),
+            preview: session.preview,
+            href: `/chat?session=${encodeURIComponent(session.session_id)}`,
+          })),
+        ),
+      )
+      .catch(() => setRemoteHistoryItems([]));
+  }, [isAuthenticated]);
+
+  const activeHistoryId = currentSessionId ?? (currentPath === "/chat" ? "current" : selectedHistoryId);
 
   useEffect(() => {
     if (!accountMenuOpen) {
@@ -258,7 +284,7 @@ export default function WorkspaceShell({
                 {historyItems.map((item) => (
                   <Link
                     className={`block w-full rounded-[18px] px-3 py-3 text-left transition ${
-                      selectedHistoryId === item.id
+                      activeHistoryId === item.id
                         ? "bg-[#edf5ff] text-[#123b5f]"
                         : "text-[#526173] hover:bg-[#f4f7fb]"
                     }`}

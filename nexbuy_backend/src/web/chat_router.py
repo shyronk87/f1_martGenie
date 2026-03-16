@@ -11,12 +11,23 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.chat_history.schema import ChatHistoryListOut
+from src.chat_history.service import (
+    append_user_message,
+    create_chat_session as create_chat_session_record,
+    load_chat_history,
+    load_chat_session_dump,
+    mark_session_failed,
+    persist_assistant_message,
+    replace_session_plans,
+)
 from src.model.bundle_composer import compose_bundle_with_ai
 from src.model.memory import get_profile
 from src.model.query_data import query_products_from_analysis
 from src.model.user_content_analysis import analyze_user_content_with_debug
-from src.web.auth.db import async_session_maker
+from src.web.auth.db import async_session_maker, get_async_session
 from src.web.auth.dependencies import CurrentActiveUser
 from src.web.auth.models import User
 
@@ -201,7 +212,10 @@ COMPOSE_TIMEOUT_SECONDS = 120
 
 
 @router.post("/sessions", response_model=SessionCreateResponse)
-async def create_session(user: User = Depends(CurrentActiveUser)) -> SessionCreateResponse:
+async def create_session(
+    user: User = Depends(CurrentActiveUser),
+    db_session: AsyncSession = Depends(get_async_session),
+) -> SessionCreateResponse:
     session_id = _new_id("sess")
     _SESSIONS[session_id] = {
         "messages": [],
@@ -209,7 +223,16 @@ async def create_session(user: User = Depends(CurrentActiveUser)) -> SessionCrea
         "plans": [],
         "user_id": str(user.id),
     }
+    await create_chat_session_record(db_session, user.id, session_id)
     return SessionCreateResponse(session_id=session_id)
+
+
+@router.get("/history", response_model=ChatHistoryListOut)
+async def get_chat_history(
+    user: User = Depends(CurrentActiveUser),
+    db_session: AsyncSession = Depends(get_async_session),
+) -> ChatHistoryListOut:
+    return await load_chat_history(db_session, user.id)
 
 
 @router.post("/sessions/{session_id}/messages", response_model=SendMessageResponse, status_code=202)
@@ -217,22 +240,43 @@ async def send_message(
     session_id: str,
     payload: ChatMessageIn,
     user: User = Depends(CurrentActiveUser),
+    db_session: AsyncSession = Depends(get_async_session),
 ) -> SendMessageResponse:
     session = _SESSIONS.get(session_id)
     if session is None:
-        raise HTTPException(status_code=404, detail="Chat session not found.")
+        session_dump = await load_chat_session_dump(db_session, user.id, session_id)
+        if session_dump is None:
+            raise HTTPException(status_code=404, detail="Chat session not found.")
+        session = {
+            "messages": list(session_dump["messages"]),
+            "timeline": [],
+            "plans": list(session_dump["plans"]),
+            "user_id": str(user.id),
+        }
+        _SESSIONS[session_id] = session
     if session.get("user_id") != str(user.id):
         raise HTTPException(status_code=403, detail="This session does not belong to current user.")
 
     message_id = _new_id("msg")
+    content = payload.content.strip()
     session["messages"].append(
         {
             "id": message_id,
             "role": "user",
-            "content": payload.content.strip(),
+            "content": content,
             "createdAt": _now_iso(),
         }
     )
+    try:
+        await append_user_message(
+            db_session,
+            user_id=user.id,
+            session_id=session_id,
+            message_id=message_id,
+            content=content,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     task_id = _new_id("task")
     _TASKS[task_id] = {"session_id": session_id, "status": "accepted"}
     return SendMessageResponse(message_id=message_id, task_id=task_id, status="accepted")
@@ -242,17 +286,16 @@ async def send_message(
 async def get_session(
     session_id: str,
     user: User = Depends(CurrentActiveUser),
+    db_session: AsyncSession = Depends(get_async_session),
 ) -> SessionDumpResponse:
-    session = _SESSIONS.get(session_id)
-    if session is None:
+    session_dump = await load_chat_session_dump(db_session, user.id, session_id)
+    if session_dump is None:
         raise HTTPException(status_code=404, detail="Chat session not found.")
-    if session.get("user_id") != str(user.id):
-        raise HTTPException(status_code=403, detail="This session does not belong to current user.")
     return SessionDumpResponse(
         session_id=session_id,
-        messages=session["messages"],
-        timeline=session["timeline"],
-        plans=session["plans"],
+        messages=session_dump["messages"],
+        timeline=[],
+        plans=session_dump["plans"],
     )
 
 
@@ -395,6 +438,22 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                     "createdAt": _now_iso(),
                 }
                 session["messages"].append(assistant_message)
+                if user_id_raw:
+                    try:
+                        async with async_session_maker() as db_session:
+                            await persist_assistant_message(
+                                db_session,
+                                user_id=UUID(user_id_raw),
+                                session_id=session_id,
+                                message_id=assistant_message["id"],
+                                content=assistant_text,
+                            )
+                    except Exception:
+                        logger.exception(
+                            "chat.stream persist_assistant_failed session_id=%s task_id=%s",
+                            session_id,
+                            task_id,
+                        )
                 yield _sse({"type": "message", "message": assistant_message})
                 yield add_timeline("done", "Need more user details before searching products.")
                 yield _sse({"type": "done"})
@@ -507,6 +566,21 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
 
                 plans = plans[:5]
                 session["plans"] = plans
+                if user_id_raw:
+                    try:
+                        async with async_session_maker() as db_session:
+                            await replace_session_plans(
+                                db_session,
+                                user_id=UUID(user_id_raw),
+                                session_id=session_id,
+                                plans=plans,
+                            )
+                    except Exception:
+                        logger.exception(
+                            "chat.stream persist_plans_failed session_id=%s task_id=%s",
+                            session_id,
+                            task_id,
+                        )
                 logger.info(
                     "chat.stream plans_ready session_id=%s task_id=%s plans=%s",
                     session_id,
@@ -534,6 +608,22 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 "createdAt": _now_iso(),
             }
             session["messages"].append(assistant_message)
+            if user_id_raw:
+                try:
+                    async with async_session_maker() as db_session:
+                        await persist_assistant_message(
+                            db_session,
+                            user_id=UUID(user_id_raw),
+                            session_id=session_id,
+                            message_id=assistant_message["id"],
+                            content=assistant_text,
+                        )
+                except Exception:
+                    logger.exception(
+                        "chat.stream persist_assistant_failed session_id=%s task_id=%s",
+                        session_id,
+                        task_id,
+                    )
             yield _sse({"type": "message", "message": assistant_message})
             yield add_timeline("done", "Query pipeline finished.")
             yield _sse({"type": "done"})
@@ -545,6 +635,17 @@ async def stream_session(session_id: str, task_id: str = Query(...)) -> Streamin
                 task_id,
                 exc,
             )
+            user_id_raw = str(session.get("user_id") or "").strip()
+            if user_id_raw:
+                try:
+                    async with async_session_maker() as db_session:
+                        await mark_session_failed(db_session, UUID(user_id_raw), session_id)
+                except Exception:
+                    logger.exception(
+                        "chat.stream mark_failed_failed session_id=%s task_id=%s",
+                        session_id,
+                        task_id,
+                    )
             yield add_timeline("error", f"Pipeline failed: {exc}")
             yield _sse({"type": "error", "error": f"Chat pipeline failed: {exc}"})
             yield _sse({"type": "done"})

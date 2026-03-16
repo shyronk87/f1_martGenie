@@ -1,10 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
   createChatSession,
+  fetchChatSessionDump,
   type ChatMessage,
   type PlanOption,
   sendChatMessage,
@@ -155,6 +156,8 @@ function clearSavedWorkspace() {
 
 export default function ChatWorkspacePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedSessionId = searchParams.get("session");
   const [isWorkspaceHydrated, setIsWorkspaceHydrated] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -212,6 +215,45 @@ export default function ChatWorkspacePage() {
       setIsWorkspaceHydrated(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isWorkspaceHydrated || !requestedSessionId) {
+      return;
+    }
+
+    const token = readAccessToken();
+    if (!token) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void fetchChatSessionDump(requestedSessionId)
+      .then((dump) => {
+        if (cancelled) {
+          return;
+        }
+        setSessionId(dump.session_id);
+        setMessages(dump.messages);
+        setTimeline([]);
+        setPlans(dump.plans);
+        setActivePlanId(dump.plans[0]?.id ?? null);
+        setStatus("Workspace restored.");
+        setError("");
+        restoredWorkspaceRef.current = true;
+        plansRef.current = dump.plans;
+      })
+      .catch((sessionError) => {
+        if (cancelled) {
+          return;
+        }
+        setError(sessionError instanceof Error ? sessionError.message : "Could not restore chat session.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isWorkspaceHydrated, requestedSessionId]);
 
   useEffect(() => {
     if (!isWorkspaceHydrated || typeof window === "undefined") {
@@ -290,6 +332,10 @@ export default function ChatWorkspacePage() {
             );
             return;
           }
+          if (requestedSessionId) {
+            setStatus("Restoring saved workspace...");
+            return;
+          }
           const createdSessionId = await createChatSession();
           if (unmounted) {
             return;
@@ -315,7 +361,7 @@ export default function ChatWorkspacePage() {
       unmounted = true;
       unsubscribeRef.current?.();
     };
-  }, [bootstrapNonce, isWorkspaceHydrated, sessionId]);
+  }, [bootstrapNonce, isWorkspaceHydrated, requestedSessionId, sessionId]);
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -551,6 +597,7 @@ export default function ChatWorkspacePage() {
   return (
     <WorkspaceShell
       currentPath="/chat"
+      currentSessionId={requestedSessionId ?? sessionId}
       isAuthenticated={isAuthenticated}
       onOpenAuth={() => setAuthOpen(true)}
       onSignOut={() => {

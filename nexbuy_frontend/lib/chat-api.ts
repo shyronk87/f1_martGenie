@@ -10,6 +10,14 @@ import type {
 
 type SessionResponse = { session_id: string };
 type SendMessageResponse = { message_id: string; task_id: string; status: string };
+type HistoryItemResponse = { session_id: string; title: string; preview: string; updated_at: string };
+type HistoryResponse = { sessions: HistoryItemResponse[] };
+type SessionDumpResponse = {
+  session_id: string;
+  messages: ChatMessage[];
+  timeline: TimelineEvent[];
+  plans: PlanOption[];
+};
 
 const DEFAULT_CHAT_MODE = "mock";
 const chatMode = (process.env.NEXT_PUBLIC_CHAT_MODE ?? DEFAULT_CHAT_MODE).toLowerCase();
@@ -37,6 +45,24 @@ export async function createChatSession(): Promise<string> {
   }
 
   return `mock-${crypto.randomUUID()}`;
+}
+
+export async function fetchChatHistory(): Promise<HistoryItemResponse[]> {
+  const response = await fetch(`${getApiBaseUrl()}/chat/history`, {
+    headers: buildAuthHeaders(),
+  });
+  const payload = await parseJsonResponse<HistoryResponse>(
+    response,
+    "Could not load chat history.",
+  );
+  return payload.sessions;
+}
+
+export async function fetchChatSessionDump(sessionId: string): Promise<SessionDumpResponse> {
+  const response = await fetch(`${getApiBaseUrl()}/chat/sessions/${sessionId}`, {
+    headers: buildAuthHeaders(),
+  });
+  return parseJsonResponse<SessionDumpResponse>(response, "Could not load chat session.");
 }
 
 export async function sendChatMessage(

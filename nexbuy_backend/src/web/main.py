@@ -8,6 +8,7 @@ from .auth.db import engine
 from .auth.models import Base
 from .agent_negotiation_router import router as agent_negotiation_router
 from .auth.router import router as auth_router
+from .chat import models as _chat_models  # noqa: F401
 from .chat_router import router as chat_router
 from .memory import models as _memory_models  # noqa: F401
 from .memory.router import router as memory_router

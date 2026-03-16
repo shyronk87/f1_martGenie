@@ -17,6 +17,7 @@ import {
   type NegotiationTurn,
 } from "@/lib/negotiation-api";
 import { readNegotiationRuns, writeNegotiatedDeal, writeNegotiationRun } from "@/lib/negotiation-store";
+import { setOrderCheckout } from "@/lib/order-store";
 import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
@@ -141,6 +142,18 @@ export default function NegotiationPage() {
     const amount = price ? Number(price) : null;
     return amount && Number.isFinite(amount) ? `$${amount.toLocaleString()}` : "Unknown";
   }, [price]);
+
+  const acceptedPrice =
+    agentResult?.outcome === "accepted" && typeof agentResult.final_price === "number"
+      ? agentResult.final_price
+      : session?.closed && typeof session.accepted_price === "number"
+        ? session.accepted_price
+        : null;
+  const originalPrice = Number(price ?? 0);
+  const negotiatedSavings =
+    acceptedPrice && Number.isFinite(originalPrice) && originalPrice > acceptedPrice
+      ? originalPrice - acceptedPrice
+      : 0;
 
   function applyStoredRun(stored: ReturnType<typeof readNegotiationRuns>[string]) {
     setMode("agent");
@@ -549,6 +562,30 @@ export default function NegotiationPage() {
     router.push("/recommendations");
   }
 
+  function handleProceedToOrder() {
+    if (!sku || acceptedPrice == null) {
+      return;
+    }
+
+    setOrderCheckout({
+      source: "negotiation",
+      packageId: planId,
+      packageTitle: title,
+      summary: `Finalized from ${planTitle} after negotiation.`,
+      items: [
+        {
+          sku,
+          title,
+          price: acceptedPrice,
+          quantity: 1,
+        },
+      ],
+      subtotal: acceptedPrice,
+      negotiatedSavings,
+    });
+    router.push("/order");
+  }
+
   useEffect(() => {
     if (!autoStart || hasAutoStartedRef.current || !isAuthenticated || !sku) {
       return;
@@ -780,6 +817,15 @@ export default function NegotiationPage() {
                   {agentResult.final_price ? ` | Final price: ${agentResult.final_price.toLocaleString()}` : ""}
                 </p>
               ) : null}
+              {acceptedPrice != null ? (
+                <button
+                  className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.16)] transition hover:brightness-105"
+                  onClick={handleProceedToOrder}
+                  type="button"
+                >
+                  Proceed to order
+                </button>
+              ) : null}
               {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
             </div>
           )}
@@ -824,6 +870,15 @@ export default function NegotiationPage() {
                     ? "Closed without accepted price"
                     : "Open"}
               </p>
+              {acceptedPrice != null ? (
+                <button
+                  className="mt-4 inline-flex h-11 items-center justify-center rounded-full border border-[#cdd9e7] bg-white px-5 text-sm font-semibold text-[#101828] transition hover:border-[#bed0e5] hover:bg-[#f8fbff]"
+                  onClick={handleProceedToOrder}
+                  type="button"
+                >
+                  Place order
+                </button>
+              ) : null}
             </div>
           ) : null}
 

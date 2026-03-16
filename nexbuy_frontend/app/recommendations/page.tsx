@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
-import { createMockOrder, type MockOrderResponse, type PlanOption } from "@/lib/chat-api";
+import type { PlanOption } from "@/lib/chat-api";
 import type { ChatMessage, TimelineEvent } from "@/lib/chat-contract";
 import { readNegotiatedDeals, readNegotiationRuns } from "@/lib/negotiation-store";
+import { setOrderCheckout } from "@/lib/order-store";
 import AuthModal from "@/src/components/AuthModal";
 import Navbar from "@/src/components/Navbar";
 
@@ -17,7 +18,6 @@ type SavedWorkspaceState = {
   plans: PlanOption[];
   activePlanId: string | null;
   status?: string;
-  orderResult: MockOrderResponse | null;
 };
 
 const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
@@ -93,9 +93,6 @@ export default function RecommendationsPage() {
   const [activePlanId, setActivePlanId] = useState<string | null>(
     initialWorkspace?.activePlanId ?? initialWorkspace?.plans?.[0]?.id ?? null,
   );
-  const [orderResult, setOrderResult] = useState<MockOrderResponse | null>(initialWorkspace?.orderResult ?? null);
-  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-  const [error, setError] = useState("");
   const [expandedNegotiationSku, setExpandedNegotiationSku] = useState<string | null>(null);
   const [targetPriceDrafts, setTargetPriceDrafts] = useState<Record<string, string>>({});
   const [maxAcceptableDrafts, setMaxAcceptableDrafts] = useState<Record<string, string>>({});
@@ -120,9 +117,8 @@ export default function RecommendationsPage() {
       sessionId: initialWorkspace.sessionId ?? null,
       plans,
       activePlanId,
-      orderResult,
     });
-  }, [activePlanId, initialWorkspace, orderResult, plans]);
+  }, [activePlanId, initialWorkspace, plans]);
 
   const negotiatedDeals = readNegotiatedDeals();
   const storedNegotiationRuns = readNegotiationRuns();
@@ -141,39 +137,28 @@ export default function RecommendationsPage() {
   const activePlan =
     displayedPlans.find((plan) => plan.id === activePlanId) ?? displayedPlans[0] ?? null;
 
-  async function handleConfirmOrder() {
-    if (!activePlan || !initialWorkspace?.plans || !initialWorkspace?.sessionId) {
+  function handleConfirmOrder() {
+    if (!activePlan) {
       return;
     }
 
-    setIsPlacingOrder(true);
-    setError("");
-
-    try {
-      const result = await createMockOrder({
-        sessionId: initialWorkspace.sessionId,
-        planId: activePlan.id,
-        items: activePlan.items.map((item) => ({
+    const subtotal = activePlan.items.reduce((sum, item) => sum + item.price, 0);
+    setOrderCheckout({
+      source: "package",
+      packageId: activePlan.id,
+      packageTitle: activePlan.title,
+      summary: activePlan.explanation || activePlan.summary,
+      items: activePlan.items.map((item) => ({
           sku: item.sku,
           title: item.title,
           price: item.price,
           quantity: 1,
+          imageUrl: item.imageUrl ?? null,
         })),
-        paymentMethod: "card",
-        shippingAddress: "Mock address",
-      });
-      setOrderResult(result);
-      writeSavedWorkspace({
-        sessionId: initialWorkspace.sessionId,
-        plans,
-        activePlanId: activePlan.id,
-        orderResult: result,
-      });
-    } catch (placeError) {
-      setError(placeError instanceof Error ? placeError.message : "Could not place this mock order.");
-    } finally {
-      setIsPlacingOrder(false);
-    }
+      subtotal,
+      negotiatedSavings: 0,
+    });
+    router.push("/order");
   }
 
   function ensureNegotiationDrafts(sku: string, price: number) {
@@ -295,22 +280,15 @@ export default function RecommendationsPage() {
                           </h2>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                          {orderResult ? (
-                            <span className="rounded-full bg-[#ecfdf3] px-3 py-1 text-xs font-semibold text-[#15803d]">
-                              Order placed: {orderResult.order_id}
-                            </span>
-                          ) : null}
                           <button
                             className="inline-flex h-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={isPlacingOrder}
                             onClick={handleConfirmOrder}
                             type="button"
                           >
-                            {isPlacingOrder ? "Placing order..." : "Place order"}
+                            Place order
                           </button>
                         </div>
                       </div>
-                      {error ? <p className="mt-4 text-sm text-[#b42318]">{error}</p> : null}
 
                       <div className="mt-5 grid gap-4 md:grid-cols-2">
                         {activePlan.items.map((item) => (

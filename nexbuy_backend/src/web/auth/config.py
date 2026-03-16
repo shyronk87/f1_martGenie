@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "nexbuy-auth"
+    app_name: str = "martgennie-auth"
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/nexbuy_auth"
     jwt_secret: str = "change-this-secret"
     access_token_lifetime_seconds: int = 3600

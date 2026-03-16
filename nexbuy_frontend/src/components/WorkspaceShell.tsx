@@ -188,7 +188,7 @@ export default function WorkspaceShell({
                   className="text-2xl font-bold uppercase tracking-[0.42em] text-[#0f172a] md:text-[1.75rem]"
                   style={{ fontFamily: "'Orbitron', 'Rajdhani', 'IBM Plex Sans', sans-serif" }}
                 >
-                  Nexbuy
+                  MartGennie
                 </p>
               </Link>
               <div className="mt-7 space-y-1">

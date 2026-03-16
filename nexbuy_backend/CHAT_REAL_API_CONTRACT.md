@@ -1,4 +1,4 @@
-# Nexbuy Chat Real 模式最小接口契约（v1）
+# MartGennie Chat Real 模式最小接口契约（v1）
 
 本文档用于前端（Next.js）与后端 Agent 编排服务联调。目标是先跑通：
 
@@ -262,4 +262,3 @@ HTTP + `detail` 字段：
 - 当前版本：`v1-minimal`
 - 新增字段保持向后兼容（前端忽略未知字段）
 - 破坏性变更需升级版本并同步前端
-

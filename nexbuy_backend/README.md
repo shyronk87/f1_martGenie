@@ -1,7 +1,7 @@
-# Nexbuy Backend
+# MartGennie Backend
 
 ## Overview
-This is the FastAPI backend for Nexbuy. It provides auth, memory profile, chat analysis, package generation, plaza data, and negotiation APIs.
+This is the FastAPI backend for MartGennie. It provides auth, memory profile, chat analysis, package generation, plaza data, and negotiation APIs.
 
 ## Environment Setup
 1. Copy the example file:

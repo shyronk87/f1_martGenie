@@ -26,7 +26,7 @@ const capabilityCards = [
   {
     eyebrow: "Chat workspace",
     title: "Start with one request and watch the workflow run",
-    copy: "Describe your room, budget, and must-have items in chat. Nexbuy turns that request into a tracked recommendation workflow with visible logs and plan output.",
+    copy: "Describe your room, budget, and must-have items in chat. MartGennie turns that request into a tracked recommendation workflow with visible logs and plan output.",
     image: "/main_page/chat.png",
     href: "/chat",
     cta: "Open chat workspace",
@@ -34,7 +34,7 @@ const capabilityCards = [
   {
     eyebrow: "Product recommendations",
     title: "Review shortlisted products and curated bundles",
-    copy: "Browse the products, showcase wins, and memory-based recommendations that Nexbuy surfaces after it understands what you are trying to buy.",
+    copy: "Browse the products, showcase wins, and memory-based recommendations that MartGennie surfaces after it understands what you are trying to buy.",
     image: "/main_page/product.png",
     href: "/plaza",
     cta: "View recommendation plaza",
@@ -98,7 +98,7 @@ const footerColumns = [
   },
   {
     title: "Company",
-    items: ["About Nexbuy", "Roadmap", "Updates", "Contact"],
+    items: ["About MartGennie", "Roadmap", "Updates", "Contact"],
   },
   {
     title: "Legal",
@@ -164,7 +164,7 @@ export default function HomePage() {
                   </span>
                 </h1>
                 <p className="mt-6 max-w-2xl text-lg leading-8 text-[#667085] md:text-xl">
-                  Nexbuy turns product discovery, bundle ranking, and price negotiation into a single
+                  MartGennie turns product discovery, bundle ranking, and price negotiation into a single
                   controlled workflow. It behaves less like a storefront and more like an execution
                   engine for high-value purchase decisions.
                 </p>

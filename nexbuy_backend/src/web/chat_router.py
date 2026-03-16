@@ -690,6 +690,6 @@ async def create_mock_order(payload: CreateMockOrderIn) -> CreateMockOrderOut:
         carrier="UPS",
         estimated_delivery_date=eta_str,
         warehouse_note="Packed and waiting for carrier pickup.",
-        support_contact="support@nexbuy.example",
+        support_contact="support@martgennie.example",
         created_at=_now_iso(),
     )

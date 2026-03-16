@@ -1,7 +1,7 @@
-# Nexbuy Frontend
+# MartGennie Frontend
 
 ## Overview
-This is the Next.js frontend for Nexbuy. It serves the main site, chat workspace, packages page, negotiation page, plaza, auth callback, and profile flows.
+This is the Next.js frontend for MartGennie. It serves the main site, chat workspace, packages page, negotiation page, plaza, auth callback, and profile flows.
 
 ## Environment Setup
 1. Copy the example file:

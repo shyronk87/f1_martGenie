@@ -299,7 +299,7 @@ export default function ProfilePage() {
                 </h2>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-[#667085]">
                   {activeSection === "memory"
-                    ? "Review what Nexbuy already knows about your style, household, and shopping habits. Edit them anytime when your preferences change."
+                    ? "Review what MartGennie already knows about your style, household, and shopping habits. Edit them anytime when your preferences change."
                     : "Save up to three addresses, choose a default one for future orders, and update any address when your delivery details change."}
                 </p>
               </div>

@@ -219,7 +219,7 @@ export default function RecommendationsPage() {
                   Packages from your latest chat session.
                 </h1>
                 <p className="mt-3 max-w-3xl text-base leading-7 text-[#667085]">
-                  Review the packages Nexbuy assembled, inspect item-level reasoning, and jump into negotiation when you want to push pricing further.
+                  Review the packages MartGennie assembled, inspect item-level reasoning, and jump into negotiation when you want to push pricing further.
                 </p>
               </div>
             </div>

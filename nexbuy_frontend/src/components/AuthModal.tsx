@@ -125,7 +125,7 @@ export default function AuthModal({ open, onClose, onAuthSuccess }: Props) {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.22),transparent_26%),radial-gradient(circle_at_80%_20%,rgba(96,165,250,0.18),transparent_18%),radial-gradient(circle_at_bottom,rgba(255,255,255,0.08),transparent_30%)]" />
                 <div className="relative">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-100/70">
-                    Welcome to Nexbuy
+                    Welcome to MartGennie
                   </p>
                   <h3 className="mt-4 max-w-sm text-4xl font-black tracking-[-0.05em]">
                     Let&apos;s make your next recommendations feel personal.

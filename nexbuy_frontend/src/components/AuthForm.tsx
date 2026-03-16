@@ -80,7 +80,7 @@ export default function AuthForm({ onSuccess }: Props) {
           Welcome
         </p>
         <h3 className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#101828] md:text-[2.2rem]">
-          {mode === "login" ? "Welcome back to Nexbuy." : "Create your Nexbuy account."}
+          {mode === "login" ? "Welcome back to MartGennie." : "Create your MartGennie account."}
         </h3>
         <p className="mt-3 max-w-[34rem] text-base leading-7 text-[#667085]">
           {mode === "login"

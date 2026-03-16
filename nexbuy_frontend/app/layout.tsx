@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nexbuy Auth Frontend",
+  title: "MartGennie Auth Frontend",
   description: "Next.js frontend wired to a FastAPI authentication backend",
 };
 

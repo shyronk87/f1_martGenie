@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
   createChatSession,
@@ -44,6 +44,29 @@ const STARTER_PROMPTS = [
   "Build a bedroom package with storage, warm wood tones, and pet-friendly fabrics.",
 ];
 const GUIDANCE_CHIPS = ["Living room", "Dining", "Bedroom", "Pet-friendly", "Budget-aware"];
+const HISTORY_PRESETS = [
+  {
+    id: "history-living-room",
+    title: "Living room refresh",
+    time: "11m ago",
+    preview: "Soft modern package, pet-friendly, under $3,000",
+    prompt: "Build a soft modern living room package with pet-friendly fabrics under $3,000.",
+  },
+  {
+    id: "history-dining",
+    title: "Dining shortlist",
+    time: "Yesterday",
+    preview: "Dining set for 4 with light oak and durable finishes",
+    prompt: "I need a dining package for 4 with light oak tones and durable finishes.",
+  },
+  {
+    id: "history-bedroom",
+    title: "Bedroom planning",
+    time: "2 days ago",
+    preview: "Bedroom package with storage and warm wood tones",
+    prompt: "Create a bedroom package with storage, warm wood tones, and soft lighting.",
+  },
+];
 
 function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
   const type = event.type.toLowerCase();
@@ -177,6 +200,7 @@ export default function ChatWorkspacePage() {
   const [isSending, setIsSending] = useState(false);
   const [runElapsedSec, setRunElapsedSec] = useState(0);
   const [streamText, setStreamText] = useState("");
+  const [selectedHistoryId, setSelectedHistoryId] = useState("current");
   const streamTextRef = useRef("");
   const plansRef = useRef<PlanOption[]>([]);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -528,9 +552,46 @@ export default function ChatWorkspacePage() {
       ]
     : messages;
   const hasConversation = renderedMessages.length > 0;
+  const currentConversationPreview = useMemo(() => {
+    const firstUserMessage = messages.find((message) => message.role === "user")?.content;
+    return firstUserMessage ? firstUserMessage.slice(0, 62) : "Start a new buying brief";
+  }, [messages]);
+  const sidebarHistory = useMemo(
+    () => [
+      {
+        id: "current",
+        title: hasConversation ? "Current workspace" : "New workspace",
+        time: hasConversation ? "Live" : "Ready",
+        preview: currentConversationPreview,
+        prompt: "",
+      },
+      ...HISTORY_PRESETS,
+    ],
+    [currentConversationPreview, hasConversation],
+  );
 
   function applyPromptSuggestion(value: string) {
     setPrompt(value);
+  }
+
+  function handleNewConversation() {
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
+    clearSavedWorkspace();
+    setSelectedHistoryId("current");
+    setMessages([]);
+    setTimeline([]);
+    setPlans([]);
+    setActivePlanId(null);
+    setPrompt("");
+    setError("");
+    setStreamText("");
+    streamTextRef.current = "";
+    setIsSending(false);
+    setSessionId(null);
+    setStatus("Preparing workspace...");
+    restoredWorkspaceRef.current = false;
+    setBootstrapNonce((current) => current + 1);
   }
 
   return (
@@ -546,161 +607,224 @@ export default function ChatWorkspacePage() {
           router.push("/");
         }}
       />
-      <div className="mx-auto grid w-full max-w-[1500px] gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-        <section className="flex min-h-[86vh] flex-col rounded-[30px] border border-[#dbe3ed] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_22px_56px_rgba(148,163,184,0.12)] md:p-6">
-          <div className="flex items-center justify-between border-b border-[#dce4ee] pb-4">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-[#101828] md:text-2xl">Agent Shopping Assistant</h1>
-              <p className="mt-1 text-sm text-[#667085]">{status}</p>
-            </div>
-            <Link
-              className="rounded-full border border-[#d2dae5] bg-white px-4 py-2 text-sm font-medium text-[#344054] transition hover:border-[#bcc7d6] hover:bg-[#f8fafc]"
-              href="/"
-            >
-              Back
-            </Link>
-          </div>
-
-          <div
-            className={`mt-4 flex-1 overflow-y-auto pr-1 ${
-              hasConversation ? "space-y-3" : "flex flex-col items-center justify-center"
-            }`}
-          >
-            {!hasConversation ? (
-              <div className="flex w-full max-w-[720px] flex-1 flex-col items-center justify-center px-3 pb-8 pt-4 text-center">
-                <div className="inline-flex h-16 w-16 items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#1d4ed8_0%,#0f766e_100%)] shadow-[0_16px_40px_rgba(29,78,216,0.18)]">
-                  <span className="text-2xl text-white">✦</span>
+      <div className="mx-auto w-full max-w-[1540px]">
+        <div className="overflow-hidden rounded-[34px] border border-[#dbe3ed] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_24px_70px_rgba(148,163,184,0.14)] lg:grid lg:min-h-[86vh] lg:grid-cols-[280px_minmax(0,1fr)_420px]">
+          <aside className="flex flex-col border-b border-[#e2e8f0] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] lg:border-b-0 lg:border-r">
+            <div className="border-b border-[#e2e8f0] px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-[#101828]">Conversations</p>
+                  <p className="mt-1 text-xs text-[#98a2b3]">Front-end history preview for now.</p>
                 </div>
-                <p className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#0f766e]">
-                  <span className="h-2 w-2 rounded-full bg-[#10b981] shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
-                  Live buying workflow
-                </p>
-                <h2
-                  className="mt-5 max-w-[640px] text-[34px] font-normal leading-[1.18] tracking-[-0.04em] text-[#111827] md:text-[44px]"
-                  style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                >
-                  Tell the agent what you need, and let it turn your brief into a shoppable package.
-                </h2>
-                <p className="mt-5 max-w-[520px] text-sm leading-7 text-[#667085] md:text-[15px]">
-                  Share the room, style, budget, and must-have items. The agent will parse your request,
-                  search products, and build packages while the system log stays visible on the right.
-                </p>
-
-                <div className="mt-8 w-full rounded-[28px] border border-[#d6e0eb] bg-white p-4 shadow-[0_18px_50px_rgba(148,163,184,0.12)] transition focus-within:border-[#8db4de] focus-within:shadow-[0_0_0_5px_rgba(147,184,230,0.14),0_18px_50px_rgba(148,163,184,0.14)]">
-                  <form onSubmit={handleSend}>
-                    <textarea
-                      className="min-h-[72px] w-full resize-none border-none bg-transparent px-1 py-1 text-[15px] leading-7 text-[#111827] outline-none placeholder:text-[#98a2b3]"
-                      disabled={!sessionId || isSending}
-                      onChange={(event) => setPrompt(event.target.value)}
-                      placeholder="Describe your room, style, budget, and must-have pieces..."
-                      rows={3}
-                      value={prompt}
-                    />
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#e6edf4] pt-3">
-                      <div className="flex flex-wrap gap-2">
-                        {GUIDANCE_CHIPS.map((chip) => (
-                          <button
-                            className="rounded-full border border-[#d8e2ec] bg-[linear-gradient(180deg,#fbfdff_0%,#f4f7fb_100%)] px-3 py-1.5 text-xs font-medium text-[#526173] transition hover:border-[#bfd4ec] hover:bg-[#eef6ff] hover:text-[#184a76]"
-                            key={chip}
-                            onClick={() => applyPromptSuggestion(chip === "Budget-aware" ? "Budget-aware package for a compact space." : `I need help with ${chip.toLowerCase()} furniture.`)}
-                            type="button"
-                          >
-                            {chip}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isSending ? (
-                          <button
-                            className="h-11 rounded-2xl border border-[#f3c7cf] bg-[#fff1f3] px-4 text-sm font-semibold text-[#be123c] transition hover:bg-[#ffe4e8]"
-                            onClick={handleCancel}
-                            type="button"
-                          >
-                            Cancel
-                          </button>
-                        ) : null}
-                        <button
-                          className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-lg text-white shadow-[0_16px_36px_rgba(15,23,42,0.16)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-[#b7c8d8] disabled:text-slate-200"
-                          disabled={!sessionId || isSending || !prompt.trim()}
-                          type="submit"
-                        >
-                          ↗
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="mt-5 flex max-w-[760px] flex-wrap justify-center gap-2">
-                  {STARTER_PROMPTS.map((suggestion) => (
-                    <button
-                      className="rounded-full border border-[#d8e2ec] bg-white px-4 py-2 text-xs text-[#667085] transition hover:border-[#bfd4ec] hover:bg-[#eef6ff] hover:text-[#1f4f78]"
-                      key={suggestion}
-                      onClick={() => applyPromptSuggestion(suggestion)}
-                      type="button"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              renderedMessages.map((message) => (
-                <article
-                  className={`max-w-[82%] rounded-[24px] px-4 py-3 text-sm leading-7 md:text-[15px] ${
-                    message.role === "user"
-                      ? "ml-auto border border-[#d6e4f5] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] text-[#123b5f] shadow-[0_10px_24px_rgba(59,130,246,0.08)]"
-                      : "mr-auto border border-[#e2e8f0] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] text-[#344054] shadow-[0_10px_24px_rgba(148,163,184,0.08)]"
-                  }`}
-                  key={message.id}
-                >
-                  <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-[#98a2b3]">
-                    {message.role === "user" ? "You" : "Agent"}
-                  </p>
-                  <p>
-                    {message.content}
-                    {message.id === "assistant-draft" && isSending ? (
-                      <span className="ml-2 text-xs text-[#98a2b3]">({runElapsedSec}s)</span>
-                    ) : null}
-                  </p>
-                </article>
-              ))
-            )}
-          </div>
-
-          {hasConversation ? (
-            <form className="mt-4 flex items-end gap-2 border-t border-[#dce4ee] pt-4" onSubmit={handleSend}>
-              <textarea
-                className="min-h-[56px] w-full resize-none rounded-2xl border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#93c5fd] focus:shadow-[0_0_0_4px_rgba(147,197,253,0.18)]"
-                disabled={!sessionId || isSending}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="Refine the brief, add another room, or ask for a different mix..."
-                rows={2}
-                value={prompt}
-              />
-              <button
-                className="h-[56px] rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-[#b7c8d8] disabled:text-slate-200"
-                disabled={!sessionId || isSending || !prompt.trim()}
-                type="submit"
-              >
-                {isSending ? "Running..." : "Send"}
-              </button>
-              {isSending ? (
                 <button
-                  className="h-[56px] rounded-2xl border border-[#f3c7cf] bg-[#fff1f3] px-4 text-sm font-semibold text-[#be123c] transition hover:bg-[#ffe4e8]"
-                  onClick={handleCancel}
+                  className="inline-flex h-10 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
+                  onClick={handleNewConversation}
                   type="button"
                 >
-                  Cancel
+                  New
                 </button>
-              ) : null}
-            </form>
-          ) : null}
-          {error ? <p className="mt-2 text-sm text-[#be123c]">{error}</p> : null}
-        </section>
+              </div>
+            </div>
 
-        <aside className="h-[86vh] overflow-hidden rounded-[28px] border border-[#dbe3ed] bg-[linear-gradient(180deg,#f8fafd_0%,#eef2f7_100%)] p-4 shadow-[0_18px_50px_rgba(148,163,184,0.12)] md:p-5">
-          <div className="flex items-center justify-between border-b border-[#dce4ee] pb-4">
+            <div className="flex-1 overflow-y-auto px-2 py-3">
+              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#98a2b3]">
+                Recent
+              </p>
+              <div className="space-y-1">
+                {sidebarHistory.map((item) => (
+                  <button
+                    className={`w-full rounded-[18px] px-3 py-3 text-left transition ${
+                      selectedHistoryId === item.id
+                        ? "bg-[#edf5ff] text-[#123b5f]"
+                        : "text-[#526173] hover:bg-[#f4f7fb]"
+                    }`}
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedHistoryId(item.id);
+                      if (item.prompt) {
+                        setPrompt(item.prompt);
+                      }
+                    }}
+                    type="button"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="truncate text-sm font-medium">{item.title}</p>
+                      <span className="shrink-0 text-[11px] text-[#98a2b3]">{item.time}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#7b8798]">{item.preview}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-[#e2e8f0] px-4 py-4">
+              <div className="rounded-[18px] bg-[linear-gradient(180deg,#f7fbff_0%,#eef5fd_100%)] px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7b8798]">Workspace</p>
+                <p className="mt-2 text-sm font-medium text-[#101828]">{status}</p>
+              </div>
+            </div>
+          </aside>
+
+          <section className="flex min-h-[86vh] flex-col border-b border-[#e2e8f0] lg:border-b-0 lg:border-r">
+            <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4 md:px-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#0f766e]">Live buying workflow</p>
+                <h1 className="mt-2 text-xl font-semibold tracking-tight text-[#101828] md:text-2xl">Agent Shopping Assistant</h1>
+              </div>
+              <Link
+                className="rounded-full border border-[#d2dae5] bg-white px-4 py-2 text-sm font-medium text-[#344054] transition hover:border-[#bcc7d6] hover:bg-[#f8fafc]"
+                href="/"
+              >
+                Back
+              </Link>
+            </div>
+
+            <div
+              className={`flex-1 overflow-y-auto px-5 py-5 md:px-6 ${
+                hasConversation ? "space-y-3" : "flex flex-col items-center justify-center"
+              }`}
+            >
+              {!hasConversation ? (
+                <div className="flex w-full max-w-[720px] flex-1 flex-col items-center justify-center px-3 pb-8 pt-4 text-center">
+                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#1d4ed8_0%,#0f766e_100%)] shadow-[0_16px_40px_rgba(29,78,216,0.18)]">
+                    <span className="text-2xl text-white">✦</span>
+                  </div>
+                  <p className="mt-6 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#0f766e]">
+                    <span className="h-2 w-2 rounded-full bg-[#10b981] shadow-[0_0_0_4px_rgba(16,185,129,0.12)]" />
+                    Live buying workflow
+                  </p>
+                  <h2
+                    className="mt-5 max-w-[640px] text-[34px] font-normal leading-[1.18] tracking-[-0.04em] text-[#111827] md:text-[44px]"
+                    style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  >
+                    Tell the agent what you need, and let it turn your brief into a shoppable package.
+                  </h2>
+                  <p className="mt-5 max-w-[520px] text-sm leading-7 text-[#667085] md:text-[15px]">
+                    Share the room, style, budget, and must-have items. The agent will parse your request,
+                    search products, and build packages while the system log stays visible on the right.
+                  </p>
+
+                  <div className="mt-8 w-full border border-[#e2e8f0] bg-white p-4">
+                    <form onSubmit={handleSend}>
+                      <textarea
+                        className="min-h-[72px] w-full resize-none border-none bg-transparent px-1 py-1 text-[15px] leading-7 text-[#111827] outline-none placeholder:text-[#98a2b3]"
+                        disabled={!sessionId || isSending}
+                        onChange={(event) => setPrompt(event.target.value)}
+                        placeholder="Describe your room, style, budget, and must-have pieces..."
+                        rows={3}
+                        value={prompt}
+                      />
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#e6edf4] pt-3">
+                        <div className="flex flex-wrap gap-2">
+                          {GUIDANCE_CHIPS.map((chip) => (
+                            <button
+                              className="rounded-full border border-[#d8e2ec] bg-[linear-gradient(180deg,#fbfdff_0%,#f4f7fb_100%)] px-3 py-1.5 text-xs font-medium text-[#526173] transition hover:border-[#bfd4ec] hover:bg-[#eef6ff] hover:text-[#184a76]"
+                              key={chip}
+                              onClick={() => applyPromptSuggestion(chip === "Budget-aware" ? "Budget-aware package for a compact space." : `I need help with ${chip.toLowerCase()} furniture.`)}
+                              type="button"
+                            >
+                              {chip}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isSending ? (
+                            <button
+                              className="h-11 rounded-2xl border border-[#f3c7cf] bg-[#fff1f3] px-4 text-sm font-semibold text-[#be123c] transition hover:bg-[#ffe4e8]"
+                              onClick={handleCancel}
+                              type="button"
+                            >
+                              Cancel
+                            </button>
+                          ) : null}
+                          <button
+                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-lg text-white shadow-[0_16px_36px_rgba(15,23,42,0.16)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-[#b7c8d8] disabled:text-slate-200"
+                            disabled={!sessionId || isSending || !prompt.trim()}
+                            type="submit"
+                          >
+                            ↗
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+
+                  <div className="mt-5 flex max-w-[760px] flex-wrap justify-center gap-2">
+                    {STARTER_PROMPTS.map((suggestion) => (
+                      <button
+                        className="rounded-full border border-[#d8e2ec] bg-white px-4 py-2 text-xs text-[#667085] transition hover:border-[#bfd4ec] hover:bg-[#eef6ff] hover:text-[#1f4f78]"
+                        key={suggestion}
+                        onClick={() => applyPromptSuggestion(suggestion)}
+                        type="button"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                renderedMessages.map((message) => (
+                  <article
+                    className={`max-w-[82%] rounded-[24px] px-4 py-3 text-sm leading-7 md:text-[15px] ${
+                      message.role === "user"
+                        ? "ml-auto border border-[#d6e4f5] bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] text-[#123b5f] shadow-[0_10px_24px_rgba(59,130,246,0.08)]"
+                        : "mr-auto border border-[#e2e8f0] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] text-[#344054] shadow-[0_10px_24px_rgba(148,163,184,0.08)]"
+                    }`}
+                    key={message.id}
+                  >
+                    <p className="mb-1 text-[10px] uppercase tracking-[0.18em] text-[#98a2b3]">
+                      {message.role === "user" ? "You" : "Agent"}
+                    </p>
+                    <p>
+                      {message.content}
+                      {message.id === "assistant-draft" && isSending ? (
+                        <span className="ml-2 text-xs text-[#98a2b3]">({runElapsedSec}s)</span>
+                      ) : null}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+
+            {hasConversation ? (
+              <form className="border-t border-[#e2e8f0] px-5 py-4 md:px-6" onSubmit={handleSend}>
+                <div className="flex items-end gap-2">
+                  <textarea
+                    className="min-h-[56px] w-full resize-none rounded-2xl border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-3 text-sm text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#93c5fd] focus:shadow-[0_0_0_4px_rgba(147,197,253,0.18)]"
+                    disabled={!sessionId || isSending}
+                    onChange={(event) => setPrompt(event.target.value)}
+                    placeholder="Refine the brief, add another room, or ask for a different mix..."
+                    rows={2}
+                    value={prompt}
+                  />
+                  <button
+                    className="h-[56px] rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_16px_36px_rgba(15,23,42,0.18)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-[#b7c8d8] disabled:text-slate-200"
+                    disabled={!sessionId || isSending || !prompt.trim()}
+                    type="submit"
+                  >
+                    {isSending ? "Running..." : "Send"}
+                  </button>
+                  {isSending ? (
+                    <button
+                      className="h-[56px] rounded-2xl border border-[#f3c7cf] bg-[#fff1f3] px-4 text-sm font-semibold text-[#be123c] transition hover:bg-[#ffe4e8]"
+                      onClick={handleCancel}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                  ) : null}
+                </div>
+                {error ? <p className="mt-2 text-sm text-[#be123c]">{error}</p> : null}
+              </form>
+            ) : error ? (
+              <div className="border-t border-[#e2e8f0] px-5 py-4 md:px-6">
+                <p className="text-sm text-[#be123c]">{error}</p>
+              </div>
+            ) : null}
+          </section>
+
+          <aside className="flex min-h-[86vh] flex-col bg-[linear-gradient(180deg,#f8fafd_0%,#eef2f7_100%)]">
+            <div className="flex items-center justify-between border-b border-[#dce4ee] px-5 py-4 md:px-5">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">Agent Process</p>
               <h2 className="mt-1 text-lg font-semibold text-[#101828]">Pipeline Log</h2>
@@ -719,32 +843,32 @@ export default function ChatWorkspacePage() {
             </span>
           </div>
 
-          <div className="mt-4 flex h-[calc(86vh-112px)] min-h-0 flex-col rounded-2xl border border-[#dce4ee] bg-white/88 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-            <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-              {timeline.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-[#dbe3ed] px-3 py-3 text-xs text-[#667085]">
-                  Backend pipeline events will appear here after you send a request.
-                </p>
-              ) : (
-                timeline.map((event) => {
-                  const friendly = buildFriendlyEvent(event);
-                  return (
-                    <article className="rounded-xl border border-[#e4eaf1] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-3 shadow-[0_8px_22px_rgba(148,163,184,0.08)]" key={event.id}>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-xs font-semibold text-[#1f3b57]">{friendly.title}</p>
-                        <p className="text-[11px] text-[#98a2b3]">
-                          {new Date(event.createdAt).toLocaleTimeString()}
-                        </p>
-                      </div>
-                      <p className="mt-1 text-xs text-[#667085]">{friendly.detail}</p>
-                    </article>
-                  );
-                })
-              )}
+                <div className="mt-4 flex h-[calc(86vh-112px)] min-h-0 flex-col rounded-2xl border border-[#dce4ee] bg-white/88 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+                {timeline.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-[#dbe3ed] px-3 py-3 text-xs text-[#667085]">
+                    Backend pipeline events will appear here after you send a request.
+                  </p>
+                ) : (
+                  timeline.map((event) => {
+                    const friendly = buildFriendlyEvent(event);
+                    return (
+                      <article className="rounded-xl border border-[#e4eaf1] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-3 shadow-[0_8px_22px_rgba(148,163,184,0.08)]" key={event.id}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold text-[#1f3b57]">{friendly.title}</p>
+                          <p className="text-[11px] text-[#98a2b3]">
+                            {new Date(event.createdAt).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <p className="mt-1 text-xs text-[#667085]">{friendly.detail}</p>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
-
-        </aside>
+          </aside>
+        </div>
       </div>
       {showOnboarding ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

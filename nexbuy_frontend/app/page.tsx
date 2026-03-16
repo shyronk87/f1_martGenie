@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import AuthModal from "@/src/components/AuthModal";
-import Navbar from "@/src/components/Navbar";
 
 const systemHighlights = [
   {
@@ -137,11 +136,6 @@ export default function HomePage() {
     void syncAuthState();
   }, []);
 
-  function handleSignOut() {
-    clearAccessToken();
-    setIsAuthenticated(false);
-  }
-
   function handleTryNow() {
     if (isAuthenticated) {
       router.push("/chat");
@@ -155,14 +149,7 @@ export default function HomePage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.95),transparent_28%),radial-gradient(circle_at_80%_18%,rgba(191,200,214,0.5),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.55),transparent_40%)]" />
 
       <div className="relative">
-        <Navbar
-          isBlurred={authOpen}
-          isAuthenticated={isAuthenticated}
-          onOpenAuth={() => setAuthOpen(true)}
-          onSignOut={handleSignOut}
-        />
-
-        <section className="mx-auto w-full max-w-[1480px] px-6 pb-12 pt-28" id="hero">
+        <section className="mx-auto w-full max-w-[1480px] px-6 pb-12 pt-12" id="hero">
           <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-stretch">
             <div className="flex max-w-4xl flex-col lg:min-h-[620px] lg:justify-between">
               <div>

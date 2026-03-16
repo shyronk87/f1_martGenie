@@ -16,7 +16,7 @@ import {
   type OrderRecord,
 } from "@/lib/order-store";
 import AuthModal from "@/src/components/AuthModal";
-import Navbar from "@/src/components/Navbar";
+import WorkspaceShell from "@/src/components/WorkspaceShell";
 
 const FULFILLMENT_STAGES = [
   "Order confirmed",
@@ -140,21 +140,19 @@ export default function OrderPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f5f8fc_0%,#eef3f9_100%)] text-[#101828]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.24),transparent_24%),radial-gradient(circle_at_82%_8%,rgba(148,163,184,0.18),transparent_20%),linear-gradient(180deg,rgba(255,255,255,0.6),transparent_42%)]" />
-      <div className="relative">
-        <Navbar
-          isAuthenticated={isAuthenticated}
-          isBlurred={authOpen}
-          onOpenAuth={() => setAuthOpen(true)}
-          onSignOut={() => {
-            clearAccessToken();
-            setIsAuthenticated(false);
-            router.push("/");
-          }}
-        />
-
-        <section className="mx-auto max-w-[1480px] px-6 pb-16 pt-28">
+    <>
+      <WorkspaceShell
+        currentPath="/order"
+        isAuthenticated={isAuthenticated}
+        onOpenAuth={() => setAuthOpen(true)}
+        onSignOut={() => {
+          clearAccessToken();
+          setIsAuthenticated(false);
+          router.push("/");
+        }}
+        workspaceStatus={currentOrder ? "Order confirmed." : "Completing checkout details."}
+      >
+        <section className="h-full overflow-y-auto px-6 py-6">
           {!checkout ? (
             <div className="rounded-[36px] border border-[#dce4ee] bg-white/90 p-10 text-center shadow-[0_24px_80px_rgba(148,163,184,0.12)] backdrop-blur-xl">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#7b8798]">Order</p>
@@ -437,8 +435,7 @@ export default function OrderPage() {
             </div>
           )}
         </section>
-      </div>
-
+      </WorkspaceShell>
       <AuthModal
         onAuthSuccess={async () => {
           const token = readAccessToken();
@@ -451,6 +448,6 @@ export default function OrderPage() {
         onClose={() => setAuthOpen(false)}
         open={authOpen}
       />
-    </main>
+    </>
   );
 }

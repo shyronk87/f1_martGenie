@@ -19,7 +19,7 @@ import {
   type UserAddressPayload,
 } from "@/lib/profile-api";
 import AuthModal from "@/src/components/AuthModal";
-import Navbar from "@/src/components/Navbar";
+import WorkspaceShell from "@/src/components/WorkspaceShell";
 
 function prettifyAnswer(value: string) {
   return value
@@ -233,21 +233,19 @@ export default function ProfilePage() {
   );
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-[#101828]">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(191,219,254,0.22),transparent_24%),radial-gradient(circle_at_85%_10%,rgba(148,163,184,0.18),transparent_18%),linear-gradient(180deg,rgba(255,255,255,0.55),transparent_40%)]" />
-      <div className="relative">
-        <Navbar
-          isAuthenticated={isAuthenticated}
-          isBlurred={authOpen}
-          onOpenAuth={() => setAuthOpen(true)}
-          onSignOut={() => {
-            clearAccessToken();
-            setIsAuthenticated(false);
-            router.push("/");
-          }}
-        />
-
-        <section className="mx-auto max-w-[1460px] px-6 pb-16 pt-28">
+    <>
+      <WorkspaceShell
+        currentPath="/profile"
+        isAuthenticated={isAuthenticated}
+        onOpenAuth={() => setAuthOpen(true)}
+        onSignOut={() => {
+          clearAccessToken();
+          setIsAuthenticated(false);
+          router.push("/");
+        }}
+        workspaceStatus={activeSection === "memory" ? "Reviewing saved preferences." : "Managing shipping addresses."}
+      >
+        <section className="h-full overflow-y-auto px-6 py-6">
           <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
             <aside className="rounded-[32px] border border-[#dde4ed] bg-[linear-gradient(180deg,#ffffff_0%,#f4f7fb_100%)] p-5 shadow-[0_20px_60px_rgba(148,163,184,0.12)]">
               <p className="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#8b97a8]">
@@ -726,8 +724,7 @@ export default function ProfilePage() {
             </section>
           </div>
         </section>
-      </div>
-
+      </WorkspaceShell>
       <AuthModal
         onAuthSuccess={async () => {
           await bootstrap();
@@ -737,6 +734,6 @@ export default function ProfilePage() {
         onClose={() => setAuthOpen(false)}
         open={authOpen}
       />
-    </main>
+    </>
   );
 }

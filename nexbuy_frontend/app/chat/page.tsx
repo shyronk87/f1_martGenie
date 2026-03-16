@@ -600,10 +600,10 @@ export default function ChatWorkspacePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-[#101828]">
-      <div className="w-full">
-        <div className="overflow-hidden border border-[#dbe3ed] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] lg:grid lg:min-h-screen lg:grid-cols-[280px_minmax(0,1fr)_420px]">
-          <aside className="flex flex-col border-b border-[#e2e8f0] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] lg:border-b-0 lg:border-r">
+    <main className="h-screen overflow-hidden bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-[#101828]">
+      <div className="h-full w-full">
+        <div className="h-full overflow-hidden border border-[#dbe3ed] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] lg:grid lg:grid-cols-[280px_minmax(0,1fr)_420px]">
+          <aside className="flex min-h-0 flex-col border-b border-[#e2e8f0] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] lg:border-b-0 lg:border-r">
             <div className="border-b border-[#e2e8f0] px-4 py-4">
               <Link className="block" href="/">
                 <p className="font-mono text-lg font-black uppercase tracking-[0.34em] text-[#0f172a]">Nexbuy</p>
@@ -639,7 +639,7 @@ export default function ChatWorkspacePage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-2 py-3">
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">
               <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#98a2b3]">
                 Recent
               </p>
@@ -723,7 +723,7 @@ export default function ChatWorkspacePage() {
             </div>
           </aside>
 
-          <section className="flex min-h-[86vh] flex-col border-b border-[#e2e8f0] lg:border-b-0 lg:border-r">
+          <section className="flex min-h-0 flex-col border-b border-[#e2e8f0] lg:border-b-0 lg:border-r">
             <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4 md:px-6">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#0f766e]">Live buying workflow</p>
@@ -881,7 +881,7 @@ export default function ChatWorkspacePage() {
             ) : null}
           </section>
 
-          <aside className="flex min-h-[86vh] flex-col bg-[linear-gradient(180deg,#f8fafd_0%,#eef2f7_100%)]">
+          <aside className="flex min-h-0 flex-col bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)]">
             <div className="flex items-center justify-between border-b border-[#dce4ee] px-5 py-4 md:px-5">
             <div>
               <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">Agent Process</p>
@@ -901,17 +901,17 @@ export default function ChatWorkspacePage() {
             </span>
           </div>
 
-                <div className="mt-4 flex h-[calc(86vh-112px)] min-h-0 flex-col rounded-2xl border border-[#dce4ee] bg-white/88 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-3 pb-3 pt-3">
+              <div className="h-full space-y-2 overflow-y-auto pr-1">
                 {timeline.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-[#dbe3ed] px-3 py-3 text-xs text-[#667085]">
+                  <p className="border border-dashed border-[#dbe3ed] bg-white/70 px-3 py-3 text-xs text-[#667085]">
                     Backend pipeline events will appear here after you send a request.
                   </p>
                 ) : (
                   timeline.map((event) => {
                     const friendly = buildFriendlyEvent(event);
                     return (
-                      <article className="rounded-xl border border-[#e4eaf1] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-3 shadow-[0_8px_22px_rgba(148,163,184,0.08)]" key={event.id}>
+                      <article className="border border-[#e4eaf1] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-3 shadow-[0_8px_22px_rgba(148,163,184,0.08)]" key={event.id}>
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-xs font-semibold text-[#1f3b57]">{friendly.title}</p>
                           <p className="text-[11px] text-[#98a2b3]">

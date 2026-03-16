@@ -19,7 +19,6 @@ import {
   type OnboardingQuestion,
 } from "@/lib/memory-api";
 import AuthModal from "@/src/components/AuthModal";
-import Navbar from "@/src/components/Navbar";
 
 type FriendlyEvent = {
   title: string;
@@ -66,6 +65,12 @@ const HISTORY_PRESETS = [
     preview: "Bedroom package with storage and warm wood tones",
     prompt: "Create a bedroom package with storage, warm wood tones, and soft lighting.",
   },
+];
+const CHAT_NAV_ITEMS = [
+  { label: "Home", href: "/" },
+  { label: "Packages", href: "/recommendations" },
+  { label: "Negotiation", href: "/negotiation" },
+  { label: "Plaza", href: "/plaza" },
 ];
 
 function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
@@ -595,34 +600,42 @@ export default function ChatWorkspacePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] px-4 pb-5 pt-24 text-[#101828] md:px-6">
-      <Navbar
-        isBlurred={authOpen}
-        isAuthenticated={isAuthenticated}
-        onOpenAuth={() => setAuthOpen(true)}
-        onSignOut={() => {
-          clearSavedWorkspace();
-          clearAccessToken();
-          setIsAuthenticated(false);
-          router.push("/");
-        }}
-      />
-      <div className="mx-auto w-full max-w-[1540px]">
-        <div className="overflow-hidden rounded-[34px] border border-[#dbe3ed] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_24px_70px_rgba(148,163,184,0.14)] lg:grid lg:min-h-[86vh] lg:grid-cols-[280px_minmax(0,1fr)_420px]">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#eef2f7_100%)] text-[#101828]">
+      <div className="w-full">
+        <div className="overflow-hidden border border-[#dbe3ed] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] lg:grid lg:min-h-screen lg:grid-cols-[280px_minmax(0,1fr)_420px]">
           <aside className="flex flex-col border-b border-[#e2e8f0] bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] lg:border-b-0 lg:border-r">
             <div className="border-b border-[#e2e8f0] px-4 py-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-[#101828]">Conversations</p>
-                  <p className="mt-1 text-xs text-[#98a2b3]">Front-end history preview for now.</p>
-                </div>
+              <Link className="block" href="/">
+                <p className="font-mono text-lg font-black uppercase tracking-[0.34em] text-[#0f172a]">Nexbuy</p>
+              </Link>
+              <div className="mt-5 space-y-1">
                 <button
-                  className="inline-flex h-10 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
                   onClick={handleNewConversation}
                   type="button"
                 >
-                  New
+                  New conversation
                 </button>
+                <nav className="space-y-1 pt-2">
+                  <span className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#98a2b3]">
+                    Navigation
+                  </span>
+                  <Link
+                    className="block rounded-[16px] px-3 py-2 text-sm font-medium text-[#123b5f] transition hover:bg-[#edf5ff]"
+                    href="/chat"
+                  >
+                    Chat
+                  </Link>
+                  {CHAT_NAV_ITEMS.map((item) => (
+                    <Link
+                      className="block rounded-[16px] px-3 py-2 text-sm font-medium text-[#526173] transition hover:bg-[#f4f7fb] hover:text-[#101828]"
+                      href={item.href}
+                      key={item.label}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </nav>
               </div>
             </div>
 
@@ -658,7 +671,52 @@ export default function ChatWorkspacePage() {
             </div>
 
             <div className="border-t border-[#e2e8f0] px-4 py-4">
-              <div className="rounded-[18px] bg-[linear-gradient(180deg,#f7fbff_0%,#eef5fd_100%)] px-4 py-3">
+              {isAuthenticated ? (
+                <div className="rounded-[18px] bg-[linear-gradient(180deg,#f7fbff_0%,#eef5fd_100%)] px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#8db4de,#1d4ed8)] text-sm font-bold text-white">
+                      NX
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[#101828]">Signed in</p>
+                      <p className="mt-1 text-xs text-[#667085]">Workspace ready across chat and deals.</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Link
+                      className="inline-flex h-10 flex-1 items-center justify-center rounded-2xl border border-[#d7e1ec] bg-white text-xs font-semibold text-[#344054] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
+                      href="/profile"
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      className="inline-flex h-10 flex-1 items-center justify-center rounded-2xl border border-[#f1c7cf] bg-[#fff1f1] text-xs font-semibold text-[#b42318] transition hover:bg-[#ffe9ea]"
+                      onClick={() => {
+                        clearSavedWorkspace();
+                        clearAccessToken();
+                        setIsAuthenticated(false);
+                        router.push("/");
+                      }}
+                      type="button"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-[18px] bg-[linear-gradient(180deg,#f7fbff_0%,#eef5fd_100%)] px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7b8798]">Account</p>
+                  <p className="mt-2 text-sm font-medium text-[#101828]">Sign in to keep your workspace and deals.</p>
+                  <button
+                    className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
+                    onClick={() => setAuthOpen(true)}
+                    type="button"
+                  >
+                    Sign in
+                  </button>
+                </div>
+              )}
+              <div className="mt-3 rounded-[18px] bg-[linear-gradient(180deg,#f7fbff_0%,#eef5fd_100%)] px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7b8798]">Workspace</p>
                 <p className="mt-2 text-sm font-medium text-[#101828]">{status}</p>
               </div>

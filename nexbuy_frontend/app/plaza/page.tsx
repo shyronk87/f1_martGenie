@@ -239,7 +239,7 @@ function renderRecommendationCard(product: PlazaRecommendationProduct) {
             {formatMoney(product.sale_price ?? 0)}
           </p>
         </div>
-        <div className="pointer-events-none absolute left-[calc(100%+16px)] top-0 z-40 hidden w-[320px] -translate-y-[84px] rounded-[24px] border border-[#dbe5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-[0_20px_48px_rgba(15,23,42,0.14)] transition duration-200 xl:block xl:opacity-0 xl:group-hover:opacity-100">
+        <div className="pointer-events-none absolute left-[calc(100%+16px)] top-0 z-40 hidden w-[320px] -translate-y-[84px] rounded-[24px] border border-[#dbe5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-[0_20px_48px_rgba(15,23,42,0.14)] xl:group-hover:block">
           <div className="flex items-start gap-3">
             {product.main_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element

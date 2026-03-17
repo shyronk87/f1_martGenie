@@ -41,7 +41,14 @@ const CHAT_HISTORY_REFRESH_EVENT = "nexbuy.chat.history.updated";
 const LEGACY_AI_STATUS = "AI is analyzing your request...";
 const AGENT_ANALYZING_STATUS = "Agent is analyzing your request...";
 const STARTER_PROMPTS = [
-  "I have a budget of $5000 for modern minimalist living room furniture. I mainly need a sectional sofa and a solid wood coffee table. I have a Golden Retriever, so the fabric needs to be scratch-resistant.",
+  {
+    title: "Example brief",
+    description:
+      "Modern minimalist living room furniture with a $5000 budget.",
+    prompt:
+      "I have a budget of $5000 for modern minimalist living room furniture. I mainly need a sectional sofa and a solid wood coffee table. I have a Golden Retriever, so the fabric needs to be scratch-resistant.",
+    highlights: ["Sectional sofa", "Solid wood coffee table", "Scratch-resistant fabric"],
+  },
 ];
 
 function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
@@ -692,12 +699,35 @@ export default function ChatWorkspacePage() {
                   <div className="mt-5 flex max-w-[760px] flex-wrap justify-center gap-2">
                     {STARTER_PROMPTS.map((suggestion) => (
                       <button
-                        className="rounded-full border border-[#d8e2ec] bg-white px-4 py-2 text-xs text-[#667085] transition hover:border-[#bfd4ec] hover:bg-[#eef6ff] hover:text-[#1f4f78]"
-                        key={suggestion}
-                        onClick={() => applyPromptSuggestion(suggestion)}
+                        className="w-full max-w-[760px] rounded-[24px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-5 py-4 text-left transition hover:border-[#bfd4ec] hover:bg-[#f7fbff] hover:shadow-[0_14px_34px_rgba(148,163,184,0.12)]"
+                        key={suggestion.prompt}
+                        onClick={() => applyPromptSuggestion(suggestion.prompt)}
                         type="button"
                       >
-                        {suggestion}
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+                              {suggestion.title}
+                            </p>
+                            <p className="mt-2 text-sm font-medium text-[#101828]">
+                              {suggestion.description}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-sm text-[#98a2b3]">↗</span>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {suggestion.highlights.map((highlight) => (
+                            <span
+                              className="rounded-full border border-[#d8e2ec] bg-white px-3 py-1 text-[11px] text-[#667085]"
+                              key={highlight}
+                            >
+                              {highlight}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-3 line-clamp-2 text-xs leading-6 text-[#667085]">
+                          {suggestion.prompt}
+                        </p>
                       </button>
                     ))}
                   </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import type { PlanOption } from "@/lib/chat-api";
 import type { ChatMessage, TimelineEvent } from "@/lib/chat-contract";
@@ -22,6 +22,9 @@ type SavedWorkspaceState = {
 };
 
 const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
+const NEGOTIATED_DEALS_STORAGE_KEY = "nexbuy.negotiation.results";
+const NEGOTIATION_RUNS_STORAGE_KEY = "nexbuy.negotiation.runs";
+
 function readSavedWorkspace(): SavedWorkspaceState | null {
   if (typeof window === "undefined") {
     return null;
@@ -34,6 +37,53 @@ function readSavedWorkspace(): SavedWorkspaceState | null {
     window.sessionStorage.removeItem(WORKSPACE_STORAGE_KEY);
     return null;
   }
+}
+
+function subscribeStorage(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener("focus", handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener("focus", handler);
+  };
+}
+
+function getWorkspaceSnapshot() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.sessionStorage.getItem(WORKSPACE_STORAGE_KEY) ?? "";
+}
+
+function getWorkspaceServerSnapshot() {
+  return "";
+}
+
+function getNegotiatedDealsSnapshot() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.localStorage.getItem(NEGOTIATED_DEALS_STORAGE_KEY) ?? "";
+}
+
+function getNegotiatedDealsServerSnapshot() {
+  return "";
+}
+
+function getNegotiationRunsSnapshot() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return window.localStorage.getItem(NEGOTIATION_RUNS_STORAGE_KEY) ?? "";
+}
+
+function getNegotiationRunsServerSnapshot() {
+  return "";
 }
 
 function writeSavedWorkspace(nextState: SavedWorkspaceState) {
@@ -87,11 +137,46 @@ export default function RecommendationsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedSnapshotId = searchParams.get("snapshot");
-  const initialWorkspace = readSavedWorkspace();
   const [authOpen, setAuthOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(readAccessToken()));
-  const [plans] = useState<PlanOption[]>(initialWorkspace?.plans ?? []);
-  const [packageSnapshots] = useState<Record<string, PlanOption[]>>(initialWorkspace?.packageSnapshots ?? {});
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const workspaceSnapshot = useSyncExternalStore(
+    subscribeStorage,
+    getWorkspaceSnapshot,
+    getWorkspaceServerSnapshot,
+  );
+  const negotiatedDealsSnapshot = useSyncExternalStore(
+    subscribeStorage,
+    getNegotiatedDealsSnapshot,
+    getNegotiatedDealsServerSnapshot,
+  );
+  const negotiationRunsSnapshot = useSyncExternalStore(
+    subscribeStorage,
+    getNegotiationRunsSnapshot,
+    getNegotiationRunsServerSnapshot,
+  );
+  const workspaceState = useMemo(() => {
+    if (!workspaceSnapshot) {
+      return null;
+    }
+    try {
+      return JSON.parse(workspaceSnapshot) as SavedWorkspaceState;
+    } catch {
+      return null;
+    }
+  }, [workspaceSnapshot]);
+  const negotiatedDeals = useMemo(
+    () => (negotiatedDealsSnapshot ? readNegotiatedDeals() : {}),
+    [negotiatedDealsSnapshot],
+  );
+  const storedNegotiationRuns = useMemo(
+    () => (negotiationRunsSnapshot ? readNegotiationRuns() : {}),
+    [negotiationRunsSnapshot],
+  );
+  const plans = useMemo(() => workspaceState?.plans ?? [], [workspaceState]);
+  const packageSnapshots = useMemo(
+    () => workspaceState?.packageSnapshots ?? {},
+    [workspaceState],
+  );
   const selectedPlans = useMemo(
     () =>
       requestedSnapshotId && packageSnapshots[requestedSnapshotId]
@@ -99,15 +184,16 @@ export default function RecommendationsPage() {
         : plans,
     [packageSnapshots, plans, requestedSnapshotId],
   );
-  const [activePlanId, setActivePlanId] = useState<string | null>(
-    (requestedSnapshotId && packageSnapshots[requestedSnapshotId]?.[0]?.id) ??
-      initialWorkspace?.activePlanId ??
-      initialWorkspace?.plans?.[0]?.id ??
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const defaultActivePlanId = useMemo(
+    () =>
+      (requestedSnapshotId && workspaceState?.packageSnapshots?.[requestedSnapshotId]?.[0]?.id) ??
+      workspaceState?.activePlanId ??
+      workspaceState?.plans?.[0]?.id ??
       null,
+    [requestedSnapshotId, workspaceState],
   );
-  const [expandedNegotiationSku, setExpandedNegotiationSku] = useState<string | null>(null);
-  const [targetPriceDrafts, setTargetPriceDrafts] = useState<Record<string, string>>({});
-  const [maxAcceptableDrafts, setMaxAcceptableDrafts] = useState<Record<string, string>>({});
+  const activePlanId = selectedPlanId ?? defaultActivePlanId;
 
   useEffect(() => {
     const token = readAccessToken();
@@ -118,23 +204,21 @@ export default function RecommendationsPage() {
     void fetchCurrentUser(token)
       .then(() => setIsAuthenticated(true))
       .catch(() => setIsAuthenticated(false));
-  }, []);
+  }, [requestedSnapshotId, workspaceState]);
 
   useEffect(() => {
-    if (!initialWorkspace) {
+    if (!workspaceState) {
       return;
     }
 
     writeSavedWorkspace({
-      sessionId: initialWorkspace.sessionId ?? null,
+      sessionId: workspaceState.sessionId ?? null,
       plans,
       packageSnapshots,
       activePlanId,
     });
-  }, [activePlanId, initialWorkspace, packageSnapshots, plans]);
+  }, [activePlanId, packageSnapshots, plans, workspaceState]);
 
-  const negotiatedDeals = readNegotiatedDeals();
-  const storedNegotiationRuns = readNegotiationRuns();
   const displayedPlans = useMemo(
     () =>
       selectedPlans.map((plan) => ({
@@ -172,26 +256,6 @@ export default function RecommendationsPage() {
       negotiatedSavings: 0,
     });
     router.push("/order");
-  }
-
-  function ensureNegotiationDrafts(sku: string, price: number) {
-    const storedRun = storedNegotiationRuns[sku];
-    setTargetPriceDrafts((current) =>
-      current[sku]
-        ? current
-        : {
-            ...current,
-            [sku]: String(storedRun?.targetPrice ?? getSuggestedTarget(price)),
-          },
-    );
-    setMaxAcceptableDrafts((current) =>
-      current[sku]
-        ? current
-        : {
-            ...current,
-            [sku]: String(storedRun?.maxAcceptablePrice ?? getSuggestedMax(price)),
-          },
-    );
   }
 
   return (
@@ -244,7 +308,7 @@ export default function RecommendationsPage() {
                             : "border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] hover:border-[#cfd8e4] hover:shadow-[0_14px_36px_rgba(148,163,184,0.12)]"
                         }`}
                         key={plan.id}
-                        onClick={() => setActivePlanId(plan.id)}
+                        onClick={() => setSelectedPlanId(plan.id)}
                         type="button"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -313,98 +377,35 @@ export default function RecommendationsPage() {
                               <p className="text-2xl font-black text-[#101828]">
                                 ${item.price.toLocaleString()}
                               </p>
-                              <button
-                                className={`mt-3 inline-flex h-11 w-full items-center justify-between rounded-2xl border px-4 text-sm font-semibold transition ${
-                                  expandedNegotiationSku === item.sku
-                                    ? "border-[#bfd4ec] bg-[linear-gradient(180deg,#eef4fb_0%,#e4eefb_100%)] text-[#1d4ed8]"
-                                    : "border-[#d7e3f4] bg-[linear-gradient(180deg,#ffffff_0%,#f6f9fd_100%)] text-[#344054] hover:border-[#bfd4ec] hover:bg-white"
-                                }`}
-                                onClick={() => {
-                                  ensureNegotiationDrafts(item.sku, item.price);
-                                  setExpandedNegotiationSku((current) =>
-                                    current === item.sku ? null : item.sku,
-                                  );
-                                }}
-                                type="button"
+                              <Link
+                                className="group mt-3 flex w-full items-center justify-between rounded-[20px] border border-[#cfe0f5] bg-[linear-gradient(135deg,#0f172a_0%,#172554_42%,#2563eb_100%)] px-4 py-3 text-white shadow-[0_16px_38px_rgba(37,99,235,0.24)] transition hover:scale-[1.01] hover:shadow-[0_20px_48px_rgba(37,99,235,0.3)]"
+                                href={`/negotiation?sku=${encodeURIComponent(item.sku)}&title=${encodeURIComponent(item.title)}&price=${encodeURIComponent(String(item.price))}&planId=${encodeURIComponent(activePlan.id)}&planTitle=${encodeURIComponent(activePlan.title)}&targetPrice=${encodeURIComponent(String(storedNegotiationRuns[item.sku]?.targetPrice ?? getSuggestedTarget(item.price)))}&maxAcceptablePrice=${encodeURIComponent(String(storedNegotiationRuns[item.sku]?.maxAcceptablePrice ?? getSuggestedMax(item.price)))}`}
                               >
-                                <span>Agent negotiate</span>
-                                <span
-                                  className={`text-base leading-none transition ${
-                                    expandedNegotiationSku === item.sku ? "rotate-180 text-[#1d4ed8]" : "text-[#98a2b3]"
-                                  }`}
-                                >
-                                  ˅
-                                </span>
-                              </button>
-                            </div>
-                            {expandedNegotiationSku === item.sku ? (
-                              <div className="mt-4 rounded-[22px] border border-[#dbe5f0] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fb_100%)] p-4">
-                                <div className="grid gap-3">
-                                  <label className="block">
-                                    <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7c8da5]">
-                                      Target price
-                                    </span>
-                                    <input
-                                      className="h-11 w-full rounded-2xl border border-[#d6e2f0] bg-white px-4 text-sm text-[#101828] outline-none focus:border-[#9dc1ea]"
-                                      min="1"
-                                      onChange={(event) =>
-                                        setTargetPriceDrafts((current) => ({
-                                          ...current,
-                                          [item.sku]: event.target.value,
-                                        }))
-                                      }
-                                      step="0.01"
-                                      type="number"
-                                      value={targetPriceDrafts[item.sku] ?? String(getSuggestedTarget(item.price))}
-                                    />
-                                  </label>
-                                  <label className="block">
-                                    <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7c8da5]">
-                                      Max acceptable
-                                    </span>
-                                    <input
-                                      className="h-11 w-full rounded-2xl border border-[#d6e2f0] bg-white px-4 text-sm text-[#101828] outline-none focus:border-[#9dc1ea]"
-                                      min="1"
-                                      onChange={(event) =>
-                                        setMaxAcceptableDrafts((current) => ({
-                                          ...current,
-                                          [item.sku]: event.target.value,
-                                        }))
-                                      }
-                                      step="0.01"
-                                      type="number"
-                                      value={maxAcceptableDrafts[item.sku] ?? String(getSuggestedMax(item.price))}
-                                    />
-                                  </label>
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-3">
-                                  <Link
-                                    className="inline-flex h-10 items-center justify-center rounded-full bg-[linear-gradient(180deg,#1f2937_0%,#111827_100%)] px-4 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(15,23,42,0.16)] transition hover:brightness-105"
-                                    href={`/negotiation?sku=${encodeURIComponent(item.sku)}&title=${encodeURIComponent(item.title)}&price=${encodeURIComponent(String(item.price))}&planId=${encodeURIComponent(activePlan.id)}&planTitle=${encodeURIComponent(activePlan.title)}&targetPrice=${encodeURIComponent(targetPriceDrafts[item.sku] ?? String(getSuggestedTarget(item.price)))}&maxAcceptablePrice=${encodeURIComponent(maxAcceptableDrafts[item.sku] ?? String(getSuggestedMax(item.price)))}&autoStart=1`}
-                                  >
-                                    Start in negotiation view
-                                  </Link>
-                                  <Link
-                                    className="inline-flex h-10 items-center justify-center rounded-full border border-[#d7e3f4] bg-white px-4 text-sm font-semibold text-[#344054] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
-                                    href={`/negotiation?sku=${encodeURIComponent(item.sku)}&title=${encodeURIComponent(item.title)}&price=${encodeURIComponent(String(item.price))}&planId=${encodeURIComponent(activePlan.id)}&planTitle=${encodeURIComponent(activePlan.title)}&targetPrice=${encodeURIComponent(targetPriceDrafts[item.sku] ?? String(getSuggestedTarget(item.price)))}&maxAcceptablePrice=${encodeURIComponent(maxAcceptableDrafts[item.sku] ?? String(getSuggestedMax(item.price)))}`}
-                                  >
-                                    View negotiation
-                                  </Link>
-                                </div>
-                                <p className="mt-4 text-xs leading-6 text-[#667085]">
-                                  The negotiation page will start the live agent bargaining flow with
-                                  these price limits if you choose the primary action.
-                                </p>
-                                {storedNegotiationRuns[item.sku]?.result?.final_price ? (
-                                  <p className="mt-3 text-sm font-medium text-[#166534]">
-                                    Last accepted deal:{" "}
-                                    ${storedNegotiationRuns[item.sku]?.result?.final_price?.toLocaleString()}
+                                <div className="min-w-0">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/75">
+                                    Agent negotiation
                                   </p>
-                                ) : null}
-                              </div>
-                            ) : null}
-                            {expandedNegotiationSku !== item.sku &&
-                            (item.description || item.categoryLabel || getSpecEntries(item.specs).length > 0) ? (
+                                  <p className="mt-1 text-sm font-semibold">
+                                    Open negotiation workspace
+                                  </p>
+                                </div>
+                                <div className="ml-6 flex shrink-0 items-center gap-3">
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                      storedNegotiationRuns[item.sku]?.result?.outcome === "accepted"
+                                        ? "bg-white/18 text-emerald-100"
+                                        : "bg-white/14 text-sky-50"
+                                    }`}
+                                  >
+                                    {storedNegotiationRuns[item.sku]?.result?.outcome === "accepted" ? "Accepted" : "Set target inside"}
+                                  </span>
+                                  <span className="text-lg leading-none text-white/90 transition group-hover:translate-x-0.5">
+                                    ↗
+                                  </span>
+                                </div>
+                              </Link>
+                            </div>
+                            {(item.description || item.categoryLabel || getSpecEntries(item.specs).length > 0) ? (
                               <div className="pointer-events-none absolute left-[calc(100%+16px)] top-0 z-20 hidden w-[320px] rounded-[24px] border border-[#dbe5f0] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-[0_20px_48px_rgba(15,23,42,0.14)] transition duration-200 group-hover:block xl:block xl:opacity-0 xl:group-hover:opacity-100">
                                 <div className="flex items-start gap-3">
                                   {item.imageUrl ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
 import {
   createChatSession,
@@ -59,85 +59,143 @@ const STARTER_PROMPTS = [
 
 function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
   const type = event.type.toLowerCase();
-  const message = event.message.toLowerCase();
+  const rawMessage = event.message.trim();
+  const message = rawMessage.toLowerCase();
+
+  if (message.includes("task accepted and dispatched")) {
+    return {
+      title: "Request received",
+      detail: "Your request is in the queue and the agent has started working on it.",
+    };
+  }
 
   if (type === "scan_started") {
     return {
-      title: "Parsing Request",
-      detail: event.message,
+      title: "Understanding your request",
+      detail: "The agent is reading your brief and identifying the key items, budget, and style.",
     };
   }
 
   if (type === "scan_progress") {
     if (message.includes("long-term memory")) {
       return {
-        title: "Loading User Memory",
-        detail: event.message,
+        title: "Checking your preferences",
+        detail: "The agent is looking at your saved shopping preferences to guide the search.",
       };
     }
     if (message.includes("structured fields extracted")) {
       return {
-        title: "Extracting Structured Fields",
-        detail: event.message,
+        title: "Brief understood",
+        detail: "Your room, budget, and must-have items have been turned into a structured shopping brief.",
+      };
+    }
+    if (message.includes("sending request to requirement-analysis model")) {
+      return {
+        title: "Understanding your request",
+        detail: "The agent is turning your message into a clear shopping plan.",
+      };
+    }
+    if (message.includes("searching product catalog")) {
+      return {
+        title: "Searching products",
+        detail: "The catalog is being searched for products that match your request.",
+      };
+    }
+    if (message.includes("query_data") || message.includes("database") || message.includes("search")) {
+      return {
+        title: "Searching products",
+        detail: "Matching products are being gathered and ranked.",
+      };
+    }
+    if (message.includes("bundle_composer")) {
+      return {
+        title: "Building packages",
+        detail: "The agent is turning the matched products into a few package options.",
       };
     }
     if (message.includes("analysis")) {
       return {
-        title: "Analyzing User Intent",
-        detail: event.message,
-      };
-    }
-    if (message.includes("query") || message.includes("database") || message.includes("search")) {
-      return {
-        title: "Searching Product Data",
-        detail: event.message,
+        title: "Understanding your request",
+        detail: "The agent is refining what matters most in your brief.",
       };
     }
     return {
-      title: "Processing Pipeline Step",
-      detail: event.message,
+      title: "Working on your request",
+      detail: "The agent is moving to the next step.",
     };
   }
 
   if (type === "candidate_found") {
     return {
-      title: "Products Matched",
-      detail: event.message,
+      title: "Products found",
+      detail: rawMessage.match(/\d+/)
+        ? `The search found ${rawMessage.match(/\d+/)?.[0]} relevant products to consider.`
+        : "The search found a set of relevant products to consider.",
     };
   }
 
   if (type === "bundle_built") {
     return {
-      title: "Building Recommendation Bundles",
-      detail: event.message,
+      title: "Building packages",
+      detail: message.includes("generated")
+        ? "The package options are ready to review."
+        : "The agent is combining the best matches into a few package options.",
     };
   }
 
   if (type === "plan_ready") {
     return {
-      title: "Recommendations Ready",
-      detail: event.message,
+      title: "Packages ready",
+      detail: "Your package options are ready to open and compare.",
     };
   }
 
   if (type === "done") {
     return {
-      title: "Pipeline Complete",
-      detail: event.message,
+      title: "Done",
+      detail: "The recommendation process is complete.",
     };
   }
 
   if (type.includes("error")) {
     return {
-      title: "Pipeline Error",
-      detail: event.message,
+      title: "Something went wrong",
+      detail: rawMessage,
     };
   }
 
   return {
-    title: "Pipeline Update",
-    detail: event.message,
+    title: "Update",
+    detail: "The agent is progressing through another step.",
   };
+}
+
+function shouldDisplayTimelineEvent(event: TimelineEvent) {
+  const message = event.message.toLowerCase();
+
+  if (
+    message.startsWith("[query_data]") ||
+    message.startsWith("[user_content_analysis]") ||
+    message.startsWith("[bundle_composer]") ||
+    message.includes("llm provider=") ||
+    message.includes("client initialized") ||
+    message.includes("json parsed") ||
+    message.includes("done in ") ||
+    message.includes("filters summary") ||
+    message.includes("valid options=") ||
+    message.includes("guard dropped") ||
+    message.includes("input candidates=") ||
+    message.includes("memory loaded but no default field was applied") ||
+    message.includes("long memory loaded") ||
+    message.includes("compacted messages=") ||
+    message.includes("matched products=") ||
+    message.includes("db query finished") ||
+    message.includes("filters built")
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 function normalizeStatus(status: string) {
@@ -710,6 +768,28 @@ export default function ChatWorkspacePage() {
         },
       ]
     : messages;
+  const displayedTimeline = useMemo(() => {
+    const visible = timeline
+      .filter(shouldDisplayTimelineEvent)
+      .map((event) => ({
+        event,
+        friendly: buildFriendlyEvent(event),
+      }));
+
+    const deduped: Array<{ event: TimelineEvent; friendly: FriendlyEvent }> = [];
+    const seen = new Set<string>();
+
+    for (const item of visible) {
+      const key = item.friendly.title;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      deduped.push(item);
+    }
+
+    return deduped;
+  }, [timeline]);
   const hasConversation = renderedMessages.length > 0;
   function applyPromptSuggestion(value: string) {
     setPrompt(value);
@@ -1011,13 +1091,12 @@ export default function ChatWorkspacePage() {
 
             <div className="min-h-0 flex-1 bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] px-3 pb-3 pt-3">
               <div className="h-full space-y-2 overflow-y-auto pr-1">
-                {timeline.length === 0 ? (
+                {displayedTimeline.length === 0 ? (
                   <p className="border border-dashed border-[#dbe3ed] bg-white/70 px-3 py-3 text-xs text-[#667085]">
-                    Backend pipeline events will appear here after you send a request.
+                    You will see simple progress updates here after you send a request.
                   </p>
                 ) : (
-                  timeline.map((event) => {
-                    const friendly = buildFriendlyEvent(event);
+                  displayedTimeline.map(({ event, friendly }) => {
                     return (
                       <article className="border border-[#e4eaf1] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-3 shadow-[0_8px_22px_rgba(148,163,184,0.08)]" key={event.id}>
                         <div className="flex items-center justify-between gap-3">

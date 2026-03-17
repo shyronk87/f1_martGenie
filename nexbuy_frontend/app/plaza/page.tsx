@@ -188,7 +188,7 @@ export default function PlazaPage() {
 function renderRecommendationCard(product: PlazaRecommendationProduct) {
     return (
       <article
-        className="group overflow-hidden rounded-[28px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.14)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.16)]"
+        className="group flex h-full flex-col overflow-hidden rounded-[28px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.14)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.16)]"
         key={product.sku_id_default}
       >
         <div className="relative h-56 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
@@ -198,10 +198,16 @@ function renderRecommendationCard(product: PlazaRecommendationProduct) {
             <img alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" src={product.main_image_url} />
           ) : null}
         </div>
-        <div className="p-5">
-          <h3 className="text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">{product.title}</h3>
-          <p className="mt-3 text-sm leading-7 text-[#475467]">{product.recommendation_reason}</p>
-          <p className="mt-5 text-xl font-black tracking-[-0.03em] text-[#0f172a]">{formatMoney(product.sale_price ?? 0)}</p>
+        <div className="flex flex-1 flex-col p-5">
+          <h3 className="line-clamp-2 min-h-[3.5rem] text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">
+            {product.title}
+          </h3>
+          <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
+            {product.recommendation_reason}
+          </p>
+          <p className="mt-auto pt-5 text-xl font-black tracking-[-0.03em] text-[#0f172a]">
+            {formatMoney(product.sale_price ?? 0)}
+          </p>
         </div>
       </article>
     );
@@ -231,7 +237,10 @@ function renderRecommendationCard(product: PlazaRecommendationProduct) {
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="font-mono text-[11px] font-bold uppercase tracking-[0.38em] text-[#7c8da5]">Personalized picks</p>
-                  <h2 className="mt-3 text-5xl font-black tracking-[-0.05em] text-[#0f172a] md:text-6xl">
+                  <h2
+                    className="mt-3 text-5xl font-normal tracking-[-0.05em] text-[#123b5f] md:text-6xl"
+                    style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  >
                     Recommended For You
                   </h2>
                 </div>
@@ -282,10 +291,7 @@ function renderRecommendationCard(product: PlazaRecommendationProduct) {
                 <div className="mt-8 space-y-10">
                   {recommendationGroups.map((group) => (
                     <section key={group.label}>
-                      <div className="flex items-center gap-4">
-                        <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[#dbe5ef] bg-[linear-gradient(180deg,#ffffff_0%,#eef3f8_100%)] text-sm font-black text-[#4b6b92]">
-                          {group.label.slice(0, 1)}
-                        </div>
+                      <div>
                         <h3 className="text-2xl font-black tracking-[-0.04em] text-[#0f172a]">{group.label}</h3>
                       </div>
                       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">

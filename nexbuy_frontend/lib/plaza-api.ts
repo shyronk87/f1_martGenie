@@ -44,6 +44,7 @@ export type PlazaRecommendationProduct = {
   sku_id_default: string;
   spu_id: string | null;
   title: string;
+  description_text: string | null;
   category_name_1: string | null;
   category_name_2: string | null;
   category_name_3: string | null;
@@ -53,6 +54,7 @@ export type PlazaRecommendationProduct = {
   stock_status_text: string | null;
   main_image_url: string | null;
   product_url: string | null;
+  specs: Record<string, string> | null;
   recommendation_reason: string;
   matched_memory_tags: string[];
 };

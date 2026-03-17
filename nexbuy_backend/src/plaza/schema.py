@@ -83,6 +83,7 @@ class PlazaRecommendationProduct(BaseModel):
     sku_id_default: str
     spu_id: str | None = None
     title: str
+    description_text: str | None = None
     category_name_1: str | None = None
     category_name_2: str | None = None
     category_name_3: str | None = None
@@ -92,6 +93,7 @@ class PlazaRecommendationProduct(BaseModel):
     stock_status_text: str | None = None
     main_image_url: str | None = None
     product_url: str | None = None
+    specs: dict[str, str] | None = None
     recommendation_reason: str
     matched_memory_tags: list[str] = Field(default_factory=list)
 

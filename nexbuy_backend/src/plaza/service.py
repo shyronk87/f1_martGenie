@@ -591,6 +591,7 @@ async def get_memory_recommendations(
                 sku_id_default=product.sku_id_default,
                 spu_id=product.spu_id,
                 title=product.title,
+                description_text=product.description_text,
                 category_name_1=product.category_name_1,
                 category_name_2=product.category_name_2,
                 category_name_3=product.category_name_3,
@@ -600,6 +601,7 @@ async def get_memory_recommendations(
                 stock_status_text=product.stock_status_text,
                 main_image_url=product.main_image_url,
                 product_url=product.product_url,
+                specs=product.specs,
                 recommendation_reason=reason,
                 matched_memory_tags=matched_tags,
             )

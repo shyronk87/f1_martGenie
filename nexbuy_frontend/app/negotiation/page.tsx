@@ -166,8 +166,6 @@ export default function NegotiationPage() {
     setStatus(stored.progressLabel);
     setThinkingMessage(stored.status === "running" ? stored.progressLabel : null);
     setError("");
-    setTargetPrice(String(stored.targetPrice));
-    setMaxAcceptablePrice(String(stored.maxAcceptablePrice));
     setAgentResult(stored.result ?? null);
     setIsRunningAgent(stored.status === "running");
     agentTurnsRef.current = stored.result?.turns ?? stored.turns;
@@ -217,6 +215,8 @@ export default function NegotiationPage() {
       return;
     }
 
+    setTargetPrice(String(stored.targetPrice));
+    setMaxAcceptablePrice(String(stored.maxAcceptablePrice));
     applyStoredRun(stored);
   }, [queryMaxAcceptablePrice, queryTargetPrice, sku]);
 
@@ -843,21 +843,18 @@ export default function NegotiationPage() {
                           value={maxAcceptablePrice}
                         />
                       </label>
-                      <div className="flex items-center gap-3 md:justify-end">
+                      <div className="flex items-center md:justify-end">
                         <button
-                          className="h-11 rounded-full border border-[#d7e1ec] bg-white px-4 text-sm font-semibold text-[#344054] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff] disabled:cursor-not-allowed disabled:opacity-60"
-                          onClick={() => void handleCancelBuyerAgent()}
+                          className={`h-11 rounded-full px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                            isRunningAgent
+                              ? "border border-[#d7e1ec] bg-white text-[#344054] hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
+                              : "bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-white hover:brightness-105"
+                          }`}
+                          disabled={!isRunningAgent && (!targetPrice.trim() || !maxAcceptablePrice.trim())}
+                          onClick={isRunningAgent ? () => void handleCancelBuyerAgent() : handleRunBuyerAgent}
                           type="button"
                         >
-                          Cancel
-                        </button>
-                        <button
-                          className="h-11 rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-                          disabled={isRunningAgent || !targetPrice.trim() || !maxAcceptablePrice.trim()}
-                          onClick={handleRunBuyerAgent}
-                          type="button"
-                        >
-                          {isRunningAgent ? "Running..." : "Start agent"}
+                          {isRunningAgent ? "Cancel" : "Run agent"}
                         </button>
                       </div>
                     </div>

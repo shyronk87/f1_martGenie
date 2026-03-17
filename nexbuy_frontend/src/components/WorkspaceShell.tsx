@@ -41,30 +41,6 @@ const NAV_ITEMS = [
   { label: "Home", href: "/" },
 ];
 
-const HISTORY_PRESETS: HistoryItem[] = [
-  {
-    id: "history-living-room",
-    title: "Living room refresh",
-    time: "11m ago",
-    preview: "Soft modern package, pet-friendly, under $3,000",
-    href: "/chat",
-  },
-  {
-    id: "history-dining",
-    title: "Dining shortlist",
-    time: "Yesterday",
-    preview: "Dining set for 4 with light oak and durable finishes",
-    href: "/chat",
-  },
-  {
-    id: "history-bedroom",
-    title: "Bedroom planning",
-    time: "2 days ago",
-    preview: "Bedroom package with storage and warm wood tones",
-    href: "/chat",
-  },
-];
-
 export default function WorkspaceShell({
   currentPath,
   isAuthenticated,
@@ -81,10 +57,7 @@ export default function WorkspaceShell({
   const [remoteHistoryItems, setRemoteHistoryItems] = useState<HistoryItem[]>([]);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const historyItems = useMemo<HistoryItem[]>(
-    () => (isAuthenticated ? remoteHistoryItems : HISTORY_PRESETS),
-    [isAuthenticated, remoteHistoryItems],
-  );
+  const historyItems = useMemo<HistoryItem[]>(() => remoteHistoryItems, [remoteHistoryItems]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -228,26 +201,32 @@ export default function WorkspaceShell({
               <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#98a2b3]">
                 Recent
               </p>
-              <div className="space-y-1">
-                {historyItems.map((item) => (
-                  <Link
-                    className={`block w-full rounded-[18px] px-3 py-3 text-left transition ${
-                      activeHistoryId === item.id
-                        ? "bg-[#edf5ff] text-[#123b5f]"
-                        : "text-[#526173] hover:bg-[#f4f7fb]"
-                    }`}
-                    href={item.href}
-                    key={item.id}
-                    onClick={() => setSelectedHistoryId(item.id)}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-medium">{item.title}</p>
-                      <span className="shrink-0 text-[11px] text-[#98a2b3]">{item.time}</span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#7b8798]">{item.preview}</p>
-                  </Link>
-                ))}
-              </div>
+              {historyItems.length > 0 ? (
+                <div className="space-y-1">
+                  {historyItems.map((item) => (
+                    <Link
+                      className={`block w-full rounded-[18px] px-3 py-3 text-left transition ${
+                        activeHistoryId === item.id
+                          ? "bg-[#edf5ff] text-[#123b5f]"
+                          : "text-[#526173] hover:bg-[#f4f7fb]"
+                      }`}
+                      href={item.href}
+                      key={item.id}
+                      onClick={() => setSelectedHistoryId(item.id)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="truncate text-sm font-medium">{item.title}</p>
+                        <span className="shrink-0 text-[11px] text-[#98a2b3]">{item.time}</span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#7b8798]">{item.preview}</p>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-3 py-2 text-xs leading-5 text-[#98a2b3]">
+                  No saved chats yet.
+                </div>
+              )}
             </div>
 
             <div className="border-t border-[#e2e8f0] px-4 py-4">

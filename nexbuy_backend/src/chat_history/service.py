@@ -185,8 +185,9 @@ async def replace_session_plans(
         await session.execute(delete(ChatPlanItemRecord).where(ChatPlanItemRecord.plan_id.in_(plan_ids)))
         await session.execute(delete(ChatPlanRecord).where(ChatPlanRecord.id.in_(plan_ids)))
 
+    plan_rows: list[ChatPlanRecord] = []
     for plan_index, plan in enumerate(plans):
-        session.add(
+        plan_rows.append(
             ChatPlanRecord(
                 id=str(plan["id"]),
                 session_id=session_id,
@@ -197,8 +198,13 @@ async def replace_session_plans(
                 total_price=float(plan["totalPrice"]),
                 confidence=float(plan["confidence"]),
                 position=plan_index,
-            )
+            ),
         )
+
+    session.add_all(plan_rows)
+    await session.flush()
+
+    for plan in plans:
         for item_index, item in enumerate(plan.get("items", [])):
             session.add(
                 ChatPlanItemRecord(

@@ -15,6 +15,16 @@ type OAuthAuthorizeResponse = {
   authorization_url: string;
 };
 
+export class AuthRequestError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "AuthRequestError";
+    this.status = status;
+  }
+}
+
 const ACCESS_TOKEN_KEY = "nexbuy.access_token";
 const DEFAULT_API_BASE_URL = "/api";
 
@@ -131,13 +141,22 @@ export async function requestAppleAuthorization() {
   return data.authorization_url;
 }
 
+export function isUnauthorizedAuthError(error: unknown) {
+  return (
+    error instanceof AuthRequestError && (error.status === 401 || error.status === 403)
+  );
+}
+
 async function parseJsonResponse<T>(response: Response, fallbackMessage: string) {
   const contentType = response.headers.get("content-type") ?? "";
   const isJson = contentType.includes("application/json");
   const payload = isJson ? ((await response.json()) as unknown) : null;
 
   if (!response.ok) {
-    throw new Error(readErrorMessage(payload, fallbackMessage));
+    throw new AuthRequestError(
+      readErrorMessage(payload, fallbackMessage),
+      response.status,
+    );
   }
 
   if (!payload) {

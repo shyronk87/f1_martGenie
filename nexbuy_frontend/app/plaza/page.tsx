@@ -219,7 +219,7 @@ export default function PlazaPage() {
   function handlePlaceProductOrder(product: PlazaRecommendationProduct) {
     const price = product.sale_price ?? 0;
     setOrderCheckout({
-      source: "package",
+      source: "plaza",
       packageId: product.sku_id_default,
       packageTitle: product.title,
       summary: product.recommendation_reason,

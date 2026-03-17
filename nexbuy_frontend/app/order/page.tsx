@@ -52,7 +52,23 @@ function generateOrderId() {
 }
 
 function getOrderBasePath(source: OrderCheckoutContext["source"]) {
-  return source === "negotiation" ? "/negotiation" : "/recommendations";
+  if (source === "negotiation") {
+    return "/negotiation";
+  }
+  if (source === "plaza") {
+    return "/plaza";
+  }
+  return "/recommendations";
+}
+
+function getBackLabel(source: OrderCheckoutContext["source"]) {
+  if (source === "negotiation") {
+    return "Back to Negotiation";
+  }
+  if (source === "plaza") {
+    return "Back to Plaza";
+  }
+  return "Back to Packages";
 }
 
 function ProgressDot(props: { done: boolean; active: boolean; icon: string }) {
@@ -123,6 +139,7 @@ export default function OrderPage() {
   const savings = checkout?.negotiatedSavings ?? 0;
   const totalAmount = subtotal + shippingFee;
   const backHref = checkout ? getOrderBasePath(checkout.source) : "/recommendations";
+  const backLabel = checkout ? getBackLabel(checkout.source) : "Back";
   const itemCount = useMemo(
     () => checkout?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
     [checkout],
@@ -240,7 +257,7 @@ export default function OrderPage() {
                   }}
                   type="button"
                 >
-                  Back to Packages
+                  {backLabel}
                 </button>
                 <button
                   className="inline-flex h-12 items-center justify-center rounded-[18px] bg-[linear-gradient(180deg,#0f172a_0%,#1d4ed8_100%)] px-6 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(29,78,216,0.22)] transition hover:brightness-105"

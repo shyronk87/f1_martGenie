@@ -702,11 +702,8 @@ export default function NegotiationPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#98a2b3]">
                   Negotiation
                 </p>
-                <h1 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#101828]">
-                  {title}
-                </h1>
                 <p className="mt-2 text-sm leading-6 text-[#667085]">
-                  Bargain on a single item with manual offers or let the buyer agent run the flow.
+                  Set your offer range, then bargain manually or let the agent work through the seller conversation.
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
@@ -890,6 +887,10 @@ export default function NegotiationPage() {
                 </p>
                 <h3 className="mt-2 text-lg font-bold leading-7 text-[#101828]">{title}</h3>
                 <p className="mt-2 text-sm text-[#667085]">From package: {planTitle}</p>
+                <div className="mt-3 rounded-[22px] border border-[#dfe7f1] bg-white px-4 py-3">
+                  <p className="text-xs text-[#98a2b3]">List price</p>
+                  <p className="mt-1 text-lg font-bold text-[#101828]">{priceLabel}</p>
+                </div>
               </section>
 
               <section className="border-b border-[#e6edf5] pb-4">
@@ -898,21 +899,16 @@ export default function NegotiationPage() {
                 </p>
                 <div className="mt-3 grid gap-3">
                   <div className="rounded-[22px] border border-[#dfe7f1] bg-white px-4 py-3">
-                    <p className="text-xs text-[#98a2b3]">List price</p>
-                    <p className="mt-1 text-lg font-bold text-[#101828]">{priceLabel}</p>
-                  </div>
-                  <div className="rounded-[22px] border border-[#dfe7f1] bg-white px-4 py-3">
-                    <p className="text-xs text-[#98a2b3]">Target price</p>
+                    <p className="text-xs text-[#98a2b3]">Seller floor</p>
                     <p className="mt-1 text-lg font-bold text-[#101828]">
-                      {targetPrice ? formatMoney(Number(targetPrice)) ?? "N/A" : "Not set"}
+                      {session
+                        ? formatMoney(Number(session.pricing_params.min_expected_price ?? 0)) ?? "N/A"
+                        : "N/A"}
                     </p>
                   </div>
-                  <div className="rounded-[22px] border border-[#dfe7f1] bg-white px-4 py-3">
-                    <p className="text-xs text-[#98a2b3]">Walk-away price</p>
-                    <p className="mt-1 text-lg font-bold text-[#101828]">
-                      {maxAcceptablePrice ? formatMoney(Number(maxAcceptablePrice)) ?? "N/A" : "Not set"}
-                    </p>
-                  </div>
+                  <p className="text-xs leading-6 text-[#667085]">
+                    Set your target and walk-away prices in the composer below. The agent will use those values for this run.
+                  </p>
                 </div>
               </section>
 
@@ -924,9 +920,6 @@ export default function NegotiationPage() {
                 {session ? (
                   <div className="mt-3 space-y-1 text-xs text-[#667085]">
                     <p>Max rounds: {session.max_rounds}</p>
-                    <p>
-                      Seller floor: {formatMoney(Number(session.pricing_params.min_expected_price ?? 0)) ?? "N/A"}
-                    </p>
                     <p>
                       Session:{" "}
                       {session.closed && session.accepted_price

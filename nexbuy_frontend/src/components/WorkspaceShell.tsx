@@ -185,13 +185,15 @@ export default function WorkspaceShell({
             <div className="border-b border-[#e2e8f0] px-4 py-4">
               <Link className="block" href="/">
                 <p
-                  className="text-2xl font-bold uppercase tracking-[0.42em] text-[#0f172a] md:text-[1.75rem]"
-                  style={{ fontFamily: "'Orbitron', 'Rajdhani', 'IBM Plex Sans', sans-serif" }}
+                  className="text-[1.55rem] font-normal tracking-[-0.04em] text-[#0f172a] md:text-[1.7rem]"
+                  style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
                 >
                   MartGennie
                 </p>
               </Link>
-              <div className="mt-7 space-y-1">
+              <div className="mt-5 -mx-4 h-px bg-[#e2e8f0]" />
+              <div className="pt-5">
+                <div className="space-y-1">
                 <button
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
                   onClick={handleNewConversation}
@@ -218,6 +220,7 @@ export default function WorkspaceShell({
                     </Link>
                   ))}
                 </nav>
+                </div>
               </div>
             </div>
 

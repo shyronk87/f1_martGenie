@@ -643,13 +643,6 @@ export default function ChatWorkspacePage() {
     >
       <div className="h-full lg:grid lg:grid-cols-[minmax(0,1fr)_420px]">
         <section className="flex min-h-0 flex-col border-b border-[#e2e8f0] lg:border-b-0 lg:border-r">
-            <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4 md:px-6">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#0f766e]">Chat</p>
-                <h1 className="mt-2 text-xl font-semibold tracking-tight text-[#101828] md:text-2xl">Agent Shopping Assistant</h1>
-              </div>
-            </div>
-
             <div
               className={`flex-1 overflow-y-auto px-5 py-5 md:px-6 ${
                 hasConversation ? "space-y-3" : "flex flex-col items-center justify-center"

@@ -217,6 +217,22 @@ export default function NegotiationPage() {
 
       const storedRun = readNegotiationRuns()[sku];
 
+      if (!storedRun) {
+        if (queryTargetPrice) {
+          setTargetPrice(queryTargetPrice);
+        }
+        if (queryMaxAcceptablePrice) {
+          setMaxAcceptablePrice(queryMaxAcceptablePrice);
+        }
+        if (!queryTargetPrice && !queryMaxAcceptablePrice && price) {
+          const numericPrice = Number(price);
+          if (Number.isFinite(numericPrice) && numericPrice > 0) {
+            setTargetPrice(String(Math.round(numericPrice * 0.9)));
+            setMaxAcceptablePrice(String(Math.round(numericPrice * 0.95)));
+          }
+        }
+      }
+
       const token = readAccessToken();
       if (!token) {
         setError("Missing access token.");
@@ -238,7 +254,6 @@ export default function NegotiationPage() {
       try {
         const created = await createNegotiationSession({
           skuIdDefault: sku,
-          buyerNote: `Hi, I am interested in ${title}. Can we discuss the price?`,
         });
 
         if (cancelled) {
@@ -264,14 +279,6 @@ export default function NegotiationPage() {
         if (!storedRun) {
           setMessages([]);
           setStatus("Set your target and max acceptable prices, then run the buyer agent.");
-        }
-        if (queryTargetPrice && queryMaxAcceptablePrice) {
-          setTargetPrice(queryTargetPrice);
-          setMaxAcceptablePrice(queryMaxAcceptablePrice);
-        } else if (price && !storedRun) {
-          const numericPrice = Number(price);
-          setTargetPrice(String(Math.round(numericPrice * 0.9)));
-          setMaxAcceptablePrice(String(Math.round(numericPrice * 0.95)));
         }
       } catch (bootstrapError) {
         const message =

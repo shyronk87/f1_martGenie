@@ -734,7 +734,12 @@ export default function PlazaPage() {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <p className="text-base font-bold text-[#0f172a]">{entry.user_display_masked}</p>
+                          <div className="flex items-center gap-3">
+                            <p className="text-base font-bold text-[#0f172a]">{entry.user_display_masked}</p>
+                            <span className="text-xs font-medium text-[#98a2b3]">
+                              {new Date(entry.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
                           <div className="mt-2">{renderStars(entry.rating)}</div>
                         </div>
                       </div>
@@ -754,26 +759,28 @@ export default function PlazaPage() {
                       ) : null}
                       <div className="mt-5 flex items-center justify-between gap-3 text-xs font-medium text-[#667085]">
                         <div className="flex items-center gap-3">
-                          <span>{new Date(entry.created_at).toLocaleDateString()}</span>
-                          <button
-                            className={`transition ${entry.current_user_liked ? "text-[#1d4ed8]" : "text-[#667085]"} disabled:cursor-not-allowed disabled:opacity-60`}
-                            disabled={!isAuthenticated || isLikingFeedbackId === entry.id}
-                            onClick={() => void handleToggleLike(entry.id)}
-                            type="button"
-                          >
-                            {entry.current_user_liked ? "Liked" : "Like"} · {entry.likes_count}
-                          </button>
+                          {entry.can_delete && entry.user_id === readAuthUserId() ? (
+                            <button
+                              className="text-[#b42318] transition hover:text-[#912018] disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={isDeletingFeedbackId === entry.id}
+                              onClick={() => void handleDeleteFeedback(entry.id)}
+                              type="button"
+                            >
+                              {isDeletingFeedbackId === entry.id ? "Deleting..." : "Delete"}
+                            </button>
+                          ) : null}
                         </div>
-                        {entry.can_delete && entry.user_id === readAuthUserId() ? (
-                          <button
-                            className="text-[#b42318] transition hover:text-[#912018] disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={isDeletingFeedbackId === entry.id}
-                            onClick={() => void handleDeleteFeedback(entry.id)}
-                            type="button"
-                          >
-                            {isDeletingFeedbackId === entry.id ? "Deleting..." : "Delete"}
-                          </button>
-                        ) : null}
+                        <button
+                          className={`inline-flex items-center gap-2 text-sm transition ${
+                            entry.current_user_liked ? "text-[#1d4ed8]" : "text-[#667085]"
+                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                          disabled={!isAuthenticated || isLikingFeedbackId === entry.id}
+                          onClick={() => void handleToggleLike(entry.id)}
+                          type="button"
+                        >
+                          <span className="text-lg leading-none">👍</span>
+                          <span>{entry.likes_count}</span>
+                        </button>
                       </div>
                     </article>
                   ))}

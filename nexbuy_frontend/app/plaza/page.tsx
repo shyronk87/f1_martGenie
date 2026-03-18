@@ -3,12 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
+import { readAuthUserId } from "@/lib/auth";
 import { clearCurrentOrder, setOrderCheckout } from "@/lib/order-store";
 import {
+  createMartGennieFeedback,
+  deleteMartGennieFeedback,
   fetchPlazaRecommendations,
+  fetchMartGennieFeedback,
   fetchPlazaShowcaseDetail,
   fetchPlazaShowcases,
   seedMockPlazaShowcases,
+  type MartGennieFeedbackItem,
   type PlazaRecommendationProduct,
   type PlazaRecommendations,
   type PlazaShowcaseDetail,
@@ -115,6 +120,11 @@ export default function PlazaPage() {
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const [feedbackItems, setFeedbackItems] = useState<MartGennieFeedbackItem[]>([]);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackDraft, setFeedbackDraft] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [isDeletingFeedbackId, setIsDeletingFeedbackId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +134,7 @@ export default function PlazaPage() {
       setError("");
       setIsLoadingRecommendations(true);
       setRecommendationError("");
+      setFeedbackError("");
 
       try {
         let list = await fetchPlazaShowcases();
@@ -163,15 +174,59 @@ export default function PlazaPage() {
                 );
               }
             }
+            try {
+              const feedbackPayload = await fetchMartGennieFeedback();
+              if (!cancelled) {
+                setFeedbackItems(feedbackPayload.items);
+              }
+            } catch (feedbackLoadError) {
+              if (!cancelled) {
+                setFeedbackError(
+                  feedbackLoadError instanceof Error
+                    ? feedbackLoadError.message
+                    : "Could not load user feedback.",
+                );
+              }
+            }
           } catch {
             if (!cancelled) {
               setIsAuthenticated(false);
               setRecommendations(null);
+              try {
+                const feedbackPayload = await fetchMartGennieFeedback();
+                if (!cancelled) {
+                  setFeedbackItems(feedbackPayload.items);
+                }
+              } catch (feedbackLoadError) {
+                if (!cancelled) {
+                  setFeedbackError(
+                    feedbackLoadError instanceof Error
+                      ? feedbackLoadError.message
+                      : "Could not load user feedback.",
+                  );
+                }
+              }
             }
           }
-        } else if (!cancelled) {
-          setIsAuthenticated(false);
-          setRecommendations(null);
+        } else {
+          if (!cancelled) {
+            setIsAuthenticated(false);
+            setRecommendations(null);
+          }
+          try {
+            const feedbackPayload = await fetchMartGennieFeedback();
+            if (!cancelled) {
+              setFeedbackItems(feedbackPayload.items);
+            }
+          } catch (feedbackLoadError) {
+            if (!cancelled) {
+              setFeedbackError(
+                feedbackLoadError instanceof Error
+                  ? feedbackLoadError.message
+                  : "Could not load user feedback.",
+              );
+            }
+          }
         }
       } catch (bootstrapError) {
         if (!cancelled) {
@@ -237,6 +292,44 @@ export default function PlazaPage() {
     });
     clearCurrentOrder();
     router.push("/order");
+  }
+
+  async function handleSubmitFeedback() {
+    if (!feedbackDraft.trim()) {
+      setFeedbackError("Write a short note before publishing your feedback.");
+      return;
+    }
+
+    try {
+      setIsSubmittingFeedback(true);
+      setFeedbackError("");
+      const created = await createMartGennieFeedback({
+        feedback_text: feedbackDraft.trim(),
+      });
+      setFeedbackItems((current) => [created, ...current].slice(0, 9));
+      setFeedbackDraft("");
+    } catch (submitError) {
+      setFeedbackError(
+        submitError instanceof Error ? submitError.message : "Could not publish your feedback.",
+      );
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
+  }
+
+  async function handleDeleteFeedback(feedbackId: string) {
+    try {
+      setIsDeletingFeedbackId(feedbackId);
+      setFeedbackError("");
+      await deleteMartGennieFeedback(feedbackId);
+      setFeedbackItems((current) => current.filter((item) => item.id !== feedbackId));
+    } catch (deleteError) {
+      setFeedbackError(
+        deleteError instanceof Error ? deleteError.message : "Could not delete your feedback.",
+      );
+    } finally {
+      setIsDeletingFeedbackId(null);
+    }
   }
 
   function renderRecommendationCard(product: PlazaRecommendationProduct, index: number) {
@@ -546,6 +639,106 @@ export default function PlazaPage() {
                   </div>
                 </div>
               ) : null}
+
+              <div className="mt-12 border-t border-[#e3e9f1] pt-8 md:pt-10">
+                <div className="max-w-3xl">
+                  <p className="font-mono text-[11px] font-bold uppercase tracking-[0.34em] text-[#7c8da5]">
+                    User feedback
+                  </p>
+                  <h2
+                    className="mt-3 text-3xl font-normal tracking-[-0.04em] text-[#123b5f] md:text-4xl"
+                    style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  >
+                    What users said about MartGennie
+                  </h2>
+                  <p className="mt-3 text-base leading-7 text-[#667085]">
+                    Recent feedback from shoppers who used MartGennie to compare packages, negotiate pricing, and make faster purchase decisions.
+                  </p>
+                </div>
+
+                {isAuthenticated ? (
+                  <div className="mt-8 rounded-[28px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.12)]">
+                    <p className="text-sm font-semibold text-[#0f172a]">Share your experience</p>
+                    <textarea
+                      className="mt-3 h-28 w-full resize-none rounded-[20px] border border-[#dbe5ef] bg-white px-4 py-3 text-sm leading-7 text-[#101828] outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                      onChange={(event) => setFeedbackDraft(event.target.value)}
+                      placeholder="Tell other shoppers how MartGennie helped you choose, compare, or negotiate."
+                      value={feedbackDraft}
+                    />
+                    <div className="mt-4 flex items-center justify-between gap-4">
+                      <p className="text-sm text-[#667085]">
+                        Share a short note about how the recommendations or negotiation experience helped you.
+                      </p>
+                      <button
+                        className="inline-flex h-11 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isSubmittingFeedback}
+                        onClick={() => void handleSubmitFeedback()}
+                        type="button"
+                      >
+                        {isSubmittingFeedback ? "Publishing..." : "Publish feedback"}
+                      </button>
+                    </div>
+                    {feedbackError ? (
+                      <p className="mt-4 text-sm font-medium text-[#b42318]">{feedbackError}</p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="mt-8 rounded-[24px] border border-dashed border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f7fafc_100%)] px-5 py-6 text-sm text-[#667085]">
+                    Sign in to leave feedback about your MartGennie shopping experience.
+                  </div>
+                )}
+
+                {feedbackError && !isAuthenticated ? (
+                  <p className="mt-4 text-sm font-medium text-[#b42318]">{feedbackError}</p>
+                ) : null}
+
+                <div className="mt-8 grid gap-5 lg:grid-cols-3">
+                  {feedbackItems.map((entry) => (
+                    <article
+                      className="rounded-[28px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.12)]"
+                      key={entry.id}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-base font-bold text-[#0f172a]">{entry.user_display_masked}</p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {entry.context_tags.map((tag) => (
+                              <span
+                                className="rounded-full border border-[#dbe5ef] bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-[#486480]"
+                                key={`${entry.id}-${tag}`}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        {entry.outcome_label ? (
+                          <div className="rounded-full bg-[linear-gradient(180deg,#eaf2fb_0%,#dbeafe_100%)] px-3 py-1 text-xs font-bold text-[#1d4ed8]">
+                            {entry.outcome_label}
+                          </div>
+                        ) : null}
+                      </div>
+                      <p className="mt-5 text-[15px] leading-8 text-[#344054]">&ldquo;{entry.feedback_text}&rdquo;</p>
+                      <div className="mt-5 flex items-center justify-between gap-3 text-xs font-medium text-[#667085]">
+                        <div className="flex items-center gap-3">
+                          <span>{new Date(entry.created_at).toLocaleDateString()}</span>
+                          {entry.saved_amount > 0 ? <span>Saved {formatMoney(entry.saved_amount)}</span> : null}
+                        </div>
+                        {entry.user_id && entry.user_id === readAuthUserId() ? (
+                          <button
+                            className="text-[#b42318] transition hover:text-[#912018] disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={isDeletingFeedbackId === entry.id}
+                            onClick={() => void handleDeleteFeedback(entry.id)}
+                            type="button"
+                          >
+                            {isDeletingFeedbackId === entry.id ? "Deleting..." : "Delete"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -568,6 +761,17 @@ export default function PlazaPage() {
               recommendationLoadError instanceof Error
                 ? recommendationLoadError.message
                 : "Could not load personalized recommendations.",
+            );
+          }
+          try {
+            const feedbackPayload = await fetchMartGennieFeedback();
+            setFeedbackItems(feedbackPayload.items);
+            setFeedbackError("");
+          } catch (feedbackLoadError) {
+            setFeedbackError(
+              feedbackLoadError instanceof Error
+                ? feedbackLoadError.message
+                : "Could not load user feedback.",
             );
           }
         }}

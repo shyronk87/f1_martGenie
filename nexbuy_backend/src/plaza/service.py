@@ -10,16 +10,46 @@ from src.model.memory import get_profile
 from src.model.query_data.db import query_products
 from src.model.query_data.schema import QueryFilters
 from src.web.auth.models import User
-from src.web.plaza.models import AgentShowcaseItemRecord, AgentShowcaseRecord
+from src.web.plaza.models import AgentShowcaseItemRecord, AgentShowcaseRecord, MartGennieFeedbackRecord
 
 from .schema import (
     AgentShowcaseCreateIn,
     AgentShowcaseDetail,
     AgentShowcaseItem,
     AgentShowcaseSummary,
+    MartGennieFeedbackCreateIn,
+    MartGennieFeedbackItem,
+    MartGennieFeedbackListOut,
     PlazaRecommendationProduct,
     PlazaRecommendationsOut,
 )
+
+DEFAULT_FEEDBACK_SEED = [
+    {
+        "user_display_masked": "A. Chen",
+        "feedback_text": "MartGennie gave me a much better starting package than browsing on my own, and the negotiation step actually helped me keep the final set under budget.",
+        "context_tags": ["Living room", "Negotiated", "Pet-friendly"],
+        "outcome_label": "Saved $240",
+        "used_negotiation": True,
+        "saved_amount": 240,
+    },
+    {
+        "user_display_masked": "M. Wong",
+        "feedback_text": "I still swapped out one item, but the package comparison was fast and realistic. It saved me from spending time on products that did not really fit together.",
+        "context_tags": ["Dining room", "Budget-aware", "4-seat setup"],
+        "outcome_label": "Compared 3 full sets",
+        "used_negotiation": False,
+        "saved_amount": 0,
+    },
+    {
+        "user_display_masked": "J. Lau",
+        "feedback_text": "What helped most was the way MartGennie explained the trade-offs. I could quickly see which option gave me the best value and which one looked strongest stylistically.",
+        "context_tags": ["First apartment", "Small space", "Modern style"],
+        "outcome_label": "Reached a decision in 1 session",
+        "used_negotiation": False,
+        "saved_amount": 0,
+    },
+]
 
 
 MOCK_AGENT_PROFILES = [
@@ -75,6 +105,29 @@ def _dedupe_keep_order(values: list[str]) -> list[str]:
         seen.add(key)
         out.append(normalized)
     return out
+
+
+def _sanitize_feedback_tags(values: list[str]) -> list[str]:
+    cleaned = _dedupe_keep_order([value.strip() for value in values])
+    return cleaned[:4]
+
+
+def _default_feedback_items() -> list[MartGennieFeedbackItem]:
+    now = datetime.now(timezone.utc)
+    return [
+        MartGennieFeedbackItem(
+            id=uuid.uuid4(),
+            user_id=None,
+            user_display_masked=entry["user_display_masked"],
+            feedback_text=entry["feedback_text"],
+            context_tags=list(entry["context_tags"]),
+            outcome_label=entry["outcome_label"],
+            used_negotiation=entry["used_negotiation"],
+            saved_amount=_money(entry["saved_amount"]),
+            created_at=now,
+        )
+        for entry in DEFAULT_FEEDBACK_SEED
+    ]
 
 
 def _memory_summary_from_profile(profile: Any) -> str:
@@ -288,6 +341,107 @@ async def _fetch_seed_products(
     )
     rows = (await session.execute(stmt, {"limit": limit})).mappings().all()
     return [dict(row) for row in rows]
+
+
+async def list_feedback(
+    session: AsyncSession,
+    *,
+    limit: int = 9,
+) -> MartGennieFeedbackListOut:
+    total_stmt = select(func.count()).select_from(MartGennieFeedbackRecord)
+    total = int((await session.execute(total_stmt)).scalar_one() or 0)
+    if total == 0:
+        seed_user = (await session.execute(select(User).limit(1))).scalars().first()
+        if seed_user is None:
+            return MartGennieFeedbackListOut(items=_default_feedback_items()[:limit])
+
+        session.add_all(
+            [
+                MartGennieFeedbackRecord(
+                    user_id=seed_user.id,
+                    user_display_masked=entry["user_display_masked"],
+                    feedback_text=entry["feedback_text"],
+                    context_tags=entry["context_tags"],
+                    outcome_label=entry["outcome_label"],
+                    used_negotiation=entry["used_negotiation"],
+                    saved_amount=entry["saved_amount"],
+                    is_public=True,
+                )
+                for entry in DEFAULT_FEEDBACK_SEED
+            ]
+        )
+        await session.commit()
+
+    stmt: Select[tuple[MartGennieFeedbackRecord]] = (
+        select(MartGennieFeedbackRecord)
+        .where(MartGennieFeedbackRecord.is_public.is_(True))
+        .order_by(MartGennieFeedbackRecord.created_at.desc())
+        .limit(limit)
+    )
+    records = (await session.execute(stmt)).scalars().all()
+    return MartGennieFeedbackListOut(
+        items=[
+            MartGennieFeedbackItem(
+                id=record.id,
+                user_id=record.user_id,
+                user_display_masked=record.user_display_masked,
+                feedback_text=record.feedback_text,
+                context_tags=list(record.context_tags or []),
+                outcome_label=record.outcome_label,
+                used_negotiation=record.used_negotiation,
+                saved_amount=_money(record.saved_amount),
+                created_at=record.created_at,
+            )
+            for record in records
+        ]
+    )
+
+
+async def create_feedback(
+    session: AsyncSession,
+    *,
+    user: User,
+    payload: MartGennieFeedbackCreateIn,
+) -> MartGennieFeedbackItem:
+    record = MartGennieFeedbackRecord(
+        user_id=user.id,
+        user_display_masked=_mask_user_display(user),
+        feedback_text=payload.feedback_text.strip(),
+        context_tags=_sanitize_feedback_tags(payload.context_tags),
+        outcome_label=payload.outcome_label.strip() if payload.outcome_label else None,
+        used_negotiation=payload.used_negotiation,
+        saved_amount=_money(payload.saved_amount),
+        is_public=True,
+    )
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return MartGennieFeedbackItem(
+        id=record.id,
+        user_id=record.user_id,
+        user_display_masked=record.user_display_masked,
+        feedback_text=record.feedback_text,
+        context_tags=list(record.context_tags or []),
+        outcome_label=record.outcome_label,
+        used_negotiation=record.used_negotiation,
+        saved_amount=_money(record.saved_amount),
+        created_at=record.created_at,
+    )
+
+
+async def delete_feedback(
+    session: AsyncSession,
+    *,
+    feedback_id: uuid.UUID,
+    user: User,
+) -> None:
+    record = await session.get(MartGennieFeedbackRecord, feedback_id)
+    if record is None:
+        raise ValueError("Feedback record not found.")
+    if record.user_id != user.id:
+        raise PermissionError("You can only delete your own feedback.")
+    await session.delete(record)
+    await session.commit()
 
 
 def _summary_query() -> Select[tuple[AgentShowcaseRecord]]:

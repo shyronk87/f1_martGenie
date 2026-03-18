@@ -66,6 +66,26 @@ export type PlazaRecommendations = {
   products: PlazaRecommendationProduct[];
 };
 
+export type MartGennieFeedbackItem = {
+  id: string;
+  user_id: string | null;
+  user_display_masked: string;
+  feedback_text: string;
+  context_tags: string[];
+  outcome_label: string | null;
+  used_negotiation: boolean;
+  saved_amount: number;
+  created_at: string;
+};
+
+export type MartGennieFeedbackList = {
+  items: MartGennieFeedbackItem[];
+};
+
+export type MartGennieFeedbackCreateInput = {
+  feedback_text: string;
+};
+
 type SeedResponse = {
   created_count: number;
   total_count: number;
@@ -107,6 +127,44 @@ export async function fetchPlazaRecommendations(): Promise<PlazaRecommendations>
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<PlazaRecommendations>(response, "Could not load personalized recommendations.");
+}
+
+export async function fetchMartGennieFeedback(limit = 9): Promise<MartGennieFeedbackList> {
+  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback?limit=${limit}`, {
+    headers: buildAuthHeaders(),
+  });
+  return parseJsonResponse<MartGennieFeedbackList>(response, "Could not load MartGennie feedback.");
+}
+
+export async function createMartGennieFeedback(
+  payload: MartGennieFeedbackCreateInput,
+): Promise<MartGennieFeedbackItem> {
+  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  return parseJsonResponse<MartGennieFeedbackItem>(response, "Could not publish your feedback.");
+}
+
+export async function deleteMartGennieFeedback(feedbackId: string): Promise<void> {
+  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback/${feedbackId}`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const contentType = response.headers.get("content-type") ?? "";
+    const isJson = contentType.includes("application/json");
+    const payload = isJson ? ((await response.json()) as unknown) : null;
+    if (payload && typeof payload === "object" && "detail" in payload && typeof payload.detail === "string") {
+      throw new Error(payload.detail);
+    }
+    throw new Error("Could not delete your feedback.");
+  }
 }
 
 async function parseJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {

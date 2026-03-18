@@ -8,13 +8,19 @@ from src.plaza import (
     AgentShowcaseDetail,
     AgentShowcaseMockSeedOut,
     AgentShowcaseSummary,
+    MartGennieFeedbackCreateIn,
+    MartGennieFeedbackItem,
+    MartGennieFeedbackListOut,
     PlazaRecommendationsOut,
 )
 from src.plaza.service import (
+    delete_feedback,
+    create_feedback,
     create_mock_showcases,
     create_showcase,
     get_memory_recommendations,
     get_showcase_detail,
+    list_feedback,
     list_showcases,
 )
 from src.web.auth.db import get_async_session
@@ -76,3 +82,34 @@ async def fetch_memory_recommendations(
     session: AsyncSession = Depends(get_async_session),
 ) -> PlazaRecommendationsOut:
     return await get_memory_recommendations(session, user=user)
+
+
+@router.get("/feedback", response_model=MartGennieFeedbackListOut)
+async def fetch_feedback(
+    limit: int = Query(default=9, ge=1, le=24),
+    session: AsyncSession = Depends(get_async_session),
+) -> MartGennieFeedbackListOut:
+    return await list_feedback(session, limit=limit)
+
+
+@router.post("/feedback", response_model=MartGennieFeedbackItem, status_code=201)
+async def create_feedback_record(
+    payload: MartGennieFeedbackCreateIn,
+    user: User = Depends(CurrentActiveUser),
+    session: AsyncSession = Depends(get_async_session),
+) -> MartGennieFeedbackItem:
+    return await create_feedback(session, user=user, payload=payload)
+
+
+@router.delete("/feedback/{feedback_id}", status_code=204)
+async def delete_feedback_record(
+    feedback_id: uuid.UUID,
+    user: User = Depends(CurrentActiveUser),
+    session: AsyncSession = Depends(get_async_session),
+) -> None:
+    try:
+        await delete_feedback(session, feedback_id=feedback_id, user=user)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc

@@ -4,10 +4,22 @@ from .schema import (
     AgentShowcaseItem,
     AgentShowcaseMockSeedOut,
     AgentShowcaseSummary,
+    MartGennieFeedbackCreateIn,
+    MartGennieFeedbackItem,
+    MartGennieFeedbackListOut,
     PlazaRecommendationProduct,
     PlazaRecommendationsOut,
 )
-from .service import create_mock_showcases, create_showcase, get_memory_recommendations, get_showcase_detail, list_showcases
+from .service import (
+    delete_feedback,
+    create_feedback,
+    create_mock_showcases,
+    create_showcase,
+    get_memory_recommendations,
+    get_showcase_detail,
+    list_feedback,
+    list_showcases,
+)
 
 __all__ = [
     "AgentShowcaseCreateIn",
@@ -15,11 +27,17 @@ __all__ = [
     "AgentShowcaseItem",
     "AgentShowcaseMockSeedOut",
     "AgentShowcaseSummary",
+    "MartGennieFeedbackCreateIn",
+    "MartGennieFeedbackItem",
+    "MartGennieFeedbackListOut",
     "PlazaRecommendationProduct",
     "PlazaRecommendationsOut",
+    "create_feedback",
+    "delete_feedback",
     "create_mock_showcases",
     "create_showcase",
     "get_memory_recommendations",
     "get_showcase_detail",
+    "list_feedback",
     "list_showcases",
 ]

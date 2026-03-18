@@ -525,14 +525,11 @@ export default function RecommendationsPage() {
                         {activePlan.items.map((item) => (
                           <div className="space-y-3" key={`${activePlan.id}-${item.sku}`}>
                             <article className="group relative flex h-full flex-col rounded-[24px] border border-[#dde5ef] bg-white p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)]">
-                              <div className="mb-3 flex items-center justify-between gap-3">
-                                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
-                                  {item.categoryLabel || "Product"}
-                                </p>
+                              <div className="mb-3 flex items-center justify-end gap-2">
                                 <div className="flex items-center gap-2">
                                   <button
                                     aria-label="Share by email"
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d4dce7] bg-white text-[15px] text-[#344054] shadow-[0_10px_20px_rgba(148,163,184,0.1)] transition hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
+                                    className="inline-flex h-8 w-8 items-center justify-center text-[24px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
                                     onClick={() => handleOpenShare(item.sku, item.title)}
                                     type="button"
                                   >
@@ -540,16 +537,16 @@ export default function RecommendationsPage() {
                                   </button>
                                   <button
                                     aria-label={favoriteSkuSet.has(item.sku) ? "Remove from likes" : "Add to likes"}
-                                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[15px] shadow-[0_10px_20px_rgba(148,163,184,0.1)] transition ${
+                                    className={`inline-flex h-8 w-8 items-center justify-center text-[26px] leading-none transition hover:-translate-y-0.5 ${
                                       favoriteSkuSet.has(item.sku)
-                                        ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                                        : "border-[#d4dce7] bg-white text-[#344054] hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
+                                        ? "text-[#dc2626]"
+                                        : "text-[#111827] hover:text-[#111827]"
                                     }`}
                                     disabled={isUpdatingFavoriteSku === item.sku}
                                     onClick={() => void handleToggleFavorite(item)}
                                     type="button"
                                   >
-                                    ♥
+                                    <span aria-hidden="true">{favoriteSkuSet.has(item.sku) ? "♥" : "♡"}</span>
                                   </button>
                                 </div>
                               </div>

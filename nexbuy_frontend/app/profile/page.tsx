@@ -394,10 +394,10 @@ export default function ProfilePage() {
                                     <p className="text-base font-semibold text-[#101828]">{question.question}</p>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                       {mergedDisplayValues.length > 0 ? (
-                                        mergedDisplayValues.map((item) => (
+                                        mergedDisplayValues.map((item, itemIndex) => (
                                           <span
                                             className="rounded-full bg-[#eef2ff] px-3 py-1.5 text-sm font-medium text-[#4338ca]"
-                                            key={`${question.key}-${item}`}
+                                            key={`${question.key}-${itemIndex}-${item}`}
                                           >
                                             {item}
                                           </span>

@@ -806,24 +806,43 @@ export default function PlazaPage() {
                   ))}
                 </div>
 
-                <div className="mt-6 flex items-center justify-between">
-                  <p className="text-sm text-[#667085]">Page {feedbackPage} of {feedbackTotalPages}</p>
-                  <div className="flex items-center gap-2">
+                <div className="mt-6 flex items-center justify-center">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] px-2 py-2 shadow-[0_10px_26px_rgba(148,163,184,0.1)]">
                     <button
-                      className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[#dce5ef] bg-white px-4 text-sm font-semibold text-[#3f5f87] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-base text-[#486480] transition hover:bg-[#eef4fb] disabled:cursor-not-allowed disabled:text-[#c0c9d5]"
                       disabled={feedbackPage <= 1}
                       onClick={() => setFeedbackPage((current) => Math.max(current - 1, 1))}
                       type="button"
                     >
-                      Previous
+                      ←
                     </button>
+                    <div className="flex items-center gap-1.5 px-1">
+                      {Array.from({ length: feedbackTotalPages }).map((_, index) => {
+                        const pageNumber = index + 1;
+                        const isActive = pageNumber === feedbackPage;
+                        return (
+                          <button
+                            className={`inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-semibold transition ${
+                              isActive
+                                ? "bg-[#111827] text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]"
+                                : "text-[#486480] hover:bg-[#eef4fb]"
+                            }`}
+                            key={pageNumber}
+                            onClick={() => setFeedbackPage(pageNumber)}
+                            type="button"
+                          >
+                            {pageNumber}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <button
-                      className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[#dce5ef] bg-white px-4 text-sm font-semibold text-[#3f5f87] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full text-base text-[#486480] transition hover:bg-[#eef4fb] disabled:cursor-not-allowed disabled:text-[#c0c9d5]"
                       disabled={feedbackPage >= feedbackTotalPages}
                       onClick={() => setFeedbackPage((current) => Math.min(current + 1, feedbackTotalPages))}
                       type="button"
                     >
-                      Next
+                      →
                     </button>
                   </div>
                 </div>

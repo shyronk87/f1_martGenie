@@ -2,10 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { clearAccessToken, fetchCurrentUser, isUnauthorizedAuthError, readAccessToken } from "@/lib/auth";
-import AuthModal from "@/src/components/AuthModal";
-import WorkspaceShell from "@/src/components/WorkspaceShell";
+import { useState } from "react";
 
 const systemHighlights = [
   {
@@ -111,54 +108,28 @@ const footerColumns = [
 ];
 
 export default function AboutPage() {
-  const [authOpen, setAuthOpen] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeHeroProduct, setActiveHeroProduct] = useState<number | null>(null);
 
-  useEffect(() => {
-    async function syncAuthState() {
-      const token = readAccessToken();
-      if (!token) {
-        setIsAuthenticated(false);
-        return;
-      }
-
-      try {
-        await fetchCurrentUser(token);
-        setIsAuthenticated(true);
-      } catch (error) {
-        if (isUnauthorizedAuthError(error)) {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          return;
-        }
-        setIsAuthenticated(true);
-      }
-    }
-
-    void syncAuthState();
-  }, []);
-
   return (
-    <>
-      <WorkspaceShell
-        currentPath="/about"
-        isAuthenticated={isAuthenticated}
-        onNewConversation={() => {
-          window.location.href = "/chat";
-        }}
-        onOpenAuth={() => setAuthOpen(true)}
-        onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          window.location.href = "/chat";
-        }}
-      >
-        <div className="min-h-full overflow-x-hidden bg-[linear-gradient(180deg,#f9fbfd_0%,#e7ebf2_100%)] text-[#101828]">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.95),transparent_28%),radial-gradient(circle_at_80%_18%,rgba(191,200,214,0.5),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.55),transparent_40%)]" />
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f9fbfd_0%,#e7ebf2_100%)] text-[#101828]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.95),transparent_28%),radial-gradient(circle_at_80%_18%,rgba(191,200,214,0.5),transparent_22%),linear-gradient(180deg,rgba(255,255,255,0.55),transparent_40%)]" />
 
-          <div className="relative">
-            <section className="mx-auto w-full max-w-[1480px] px-6 pb-12 pt-12" id="hero">
+      <div className="relative">
+        <section className="mx-auto w-full max-w-[1480px] px-6 pb-12 pt-12" id="hero">
+          <div className="mb-8 flex items-center justify-between gap-4">
+            <Link
+              className="inline-flex items-center gap-2 rounded-full border border-[#d7dee8] bg-white/80 px-4 py-2 text-sm font-semibold text-[#344054] backdrop-blur-xl transition hover:border-[#c2ccd8] hover:bg-white"
+              href="/chat"
+            >
+              ← Back to chat
+            </Link>
+            <div
+              className="text-xl font-semibold tracking-[-0.03em] text-[#101828] md:text-2xl"
+              style={{ fontFamily: "Georgia, Cambria, 'Times New Roman', Times, serif" }}
+            >
+              MartGennie
+            </div>
+          </div>
               <div className="grid gap-10 lg:grid-cols-[1.2fr_0.8fr] lg:items-stretch">
                 <div className="flex max-w-4xl flex-col lg:min-h-[620px] lg:justify-between">
                   <div>
@@ -250,9 +221,9 @@ export default function AboutPage() {
                   <div className="absolute bottom-12 right-6 h-36 w-36 rounded-full bg-sky-200/35 blur-3xl" />
                 </aside>
               </div>
-            </section>
+        </section>
 
-            <section className="mx-auto grid w-full max-w-[1480px] gap-5 px-6 py-6 lg:grid-cols-[0.8fr_1.2fr]" id="system">
+        <section className="mx-auto grid w-full max-w-[1480px] gap-5 px-6 py-6 lg:grid-cols-[0.8fr_1.2fr]" id="system">
               <article className="rounded-[32px] border border-[#dce3ed] bg-white/82 p-6 backdrop-blur-2xl">
                 <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">System trace</p>
                 <h2 className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#101828] md:text-4xl">
@@ -286,9 +257,9 @@ export default function AboutPage() {
                   ))}
                 </div>
               </article>
-            </section>
+        </section>
 
-            <section className="mx-auto w-full max-w-[1480px] px-6 py-8">
+        <section className="mx-auto w-full max-w-[1480px] px-6 py-8">
               <div className="border-b border-[#dce3ed] pb-5">
                 <p className="text-xs uppercase tracking-[0.22em] text-[#8b97a8]">Core surfaces</p>
                 <h2 className="mt-2 max-w-4xl text-4xl font-black tracking-[-0.04em] text-[#101828] md:text-5xl">
@@ -327,9 +298,9 @@ export default function AboutPage() {
                   );
                 })}
               </div>
-            </section>
+        </section>
 
-            <section className="mx-auto w-full max-w-[1480px] px-6 pb-16 pt-10">
+        <section className="mx-auto w-full max-w-[1480px] px-6 pb-16 pt-10">
               <div className="rounded-[28px] bg-[linear-gradient(180deg,#f2f5f8_0%,#eceff4_100%)] px-5 py-10 md:px-8 lg:px-10">
                 <div className="grid gap-10 border-t border-[#d6dde7] pt-8 md:grid-cols-2 lg:grid-cols-5">
                   {footerColumns.map((column) => (
@@ -346,53 +317,43 @@ export default function AboutPage() {
                   ))}
                 </div>
               </div>
-            </section>
-          </div>
+        </section>
 
-          <style jsx global>{`
-            @keyframes fadeUp {
-              from {
-                opacity: 0;
-                transform: translateY(12px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
+        <style jsx global>{`
+          @keyframes fadeUp {
+            from {
+              opacity: 0;
+              transform: translateY(12px);
             }
-
-            .button-beam {
-              background: conic-gradient(
-                from 180deg,
-                rgba(255, 255, 255, 0) 0deg,
-                rgba(255, 255, 255, 0.88) 48deg,
-                rgba(125, 211, 252, 0.82) 84deg,
-                rgba(37, 99, 235, 0.86) 126deg,
-                rgba(255, 255, 255, 0) 170deg,
-                rgba(255, 255, 255, 0) 360deg
-              );
-              animation: beamRotate 4.8s linear infinite;
+            to {
+              opacity: 1;
+              transform: translateY(0);
             }
+          }
 
-            @keyframes beamRotate {
-              from {
-                transform: rotate(0deg);
-              }
-              to {
-                transform: rotate(360deg);
-              }
+          .button-beam {
+            background: conic-gradient(
+              from 180deg,
+              rgba(255, 255, 255, 0) 0deg,
+              rgba(255, 255, 255, 0.88) 48deg,
+              rgba(125, 211, 252, 0.82) 84deg,
+              rgba(37, 99, 235, 0.86) 126deg,
+              rgba(255, 255, 255, 0) 170deg,
+              rgba(255, 255, 255, 0) 360deg
+            );
+            animation: beamRotate 4.8s linear infinite;
+          }
+
+          @keyframes beamRotate {
+            from {
+              transform: rotate(0deg);
             }
-          `}</style>
-        </div>
-      </WorkspaceShell>
-
-      <AuthModal
-        onAuthSuccess={() => {
-          setIsAuthenticated(true);
-        }}
-        onClose={() => setAuthOpen(false)}
-        open={authOpen}
-      />
-    </>
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+      </div>
+    </div>
   );
 }

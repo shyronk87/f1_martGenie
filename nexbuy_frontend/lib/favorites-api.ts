@@ -139,10 +139,7 @@ async function ensureOk(response: Response, fallbackMessage: string): Promise<vo
     const contentType = response.headers.get("content-type") ?? "";
     const isJson = contentType.includes("application/json");
     const payload = isJson ? ((await response.json()) as unknown) : null;
-    if (payload && typeof payload === "object" && "detail" in payload && typeof payload.detail === "string") {
-      throw new Error(payload.detail);
-    }
-    throw new Error(fallbackMessage);
+    throw new Error(readErrorMessage(payload, fallbackMessage));
   }
 }
 
@@ -152,10 +149,7 @@ async function parseJsonResponse<T>(response: Response, fallbackMessage: string)
   const payload = isJson ? ((await response.json()) as unknown) : null;
 
   if (!response.ok) {
-    if (payload && typeof payload === "object" && "detail" in payload && typeof payload.detail === "string") {
-      throw new Error(payload.detail);
-    }
-    throw new Error(fallbackMessage);
+    throw new Error(readErrorMessage(payload, fallbackMessage));
   }
 
   if (!payload) {
@@ -163,4 +157,42 @@ async function parseJsonResponse<T>(response: Response, fallbackMessage: string)
   }
 
   return payload as T;
+}
+
+function readErrorMessage(payload: unknown, fallbackMessage: string) {
+  if (!payload || typeof payload !== "object") {
+    return fallbackMessage;
+  }
+
+  if (!("detail" in payload)) {
+    return fallbackMessage;
+  }
+
+  const detail = payload.detail;
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const message = detail
+      .map((issue) => {
+        if (!issue || typeof issue !== "object") {
+          return null;
+        }
+        const path =
+          "loc" in issue && Array.isArray(issue.loc)
+            ? issue.loc.filter((part: unknown): part is string => typeof part === "string").join(" / ")
+            : "";
+        const issueMessage = "msg" in issue && typeof issue.msg === "string" ? issue.msg : fallbackMessage;
+        return path ? `${path}: ${issueMessage}` : issueMessage;
+      })
+      .filter((item): item is string => Boolean(item))
+      .join(" · ");
+
+    if (message) {
+      return message;
+    }
+  }
+
+  return fallbackMessage;
 }

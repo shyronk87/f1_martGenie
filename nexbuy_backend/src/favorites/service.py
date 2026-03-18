@@ -138,7 +138,7 @@ async def create_favorite_bundle(
     existing.total_price = payload.total_price
     existing.source_session_id = payload.source_session_id
     existing.source_page = payload.source_page
-    existing.items = payload.items
+    existing.items = [item.model_dump() for item in payload.items]
 
     await session.commit()
     await session.refresh(existing)

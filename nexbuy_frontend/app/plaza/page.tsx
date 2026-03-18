@@ -347,14 +347,14 @@ export default function PlazaPage() {
         }}
       >
         <section className="mx-auto max-w-[1380px] px-6 py-10">
-          <div className="rounded-[40px] border border-[#dce5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(245,249,253,0.9)_100%)] p-8 shadow-[0_32px_90px_rgba(148,163,184,0.16)] backdrop-blur-xl md:p-10">
+          <div className="md:px-2">
             {error ? (
               <div className="rounded-[24px] border border-[#fecaca] bg-[#fff1f2] px-5 py-4 text-sm font-medium text-[#b42318]">
                 {error}
               </div>
             ) : null}
 
-            <div className={error ? "mt-10 rounded-[34px] border border-[#dbe5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(243,247,251,0.88)_100%)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] md:p-8" : "rounded-[34px] border border-[#dbe5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(243,247,251,0.88)_100%)] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] md:p-8"}>
+            <div className={error ? "mt-10 border-b border-[#e3e9f1] pb-10 md:pb-12" : "border-b border-[#e3e9f1] pb-10 md:pb-12"}>
               <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="font-mono text-[11px] font-bold uppercase tracking-[0.38em] text-[#7c8da5]">Personalized picks</p>
@@ -425,7 +425,7 @@ export default function PlazaPage() {
             </div>
 
             <div className="mt-10">
-              <div className="inline-flex items-center gap-3 rounded-full border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#edf3f8_100%)] px-4 py-2 text-sm font-bold text-[#3f5f87] shadow-[0_12px_26px_rgba(148,163,184,0.1)]">
+              <div className="inline-flex items-center gap-3 px-1 py-1 text-sm font-bold text-[#3f5f87]">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(180deg,#bfdbfe_0%,#60a5fa_100%)] text-white">↗</span>
                 Agent Wins
               </div>
@@ -491,7 +491,7 @@ export default function PlazaPage() {
               </div>
 
               {!isBootstrapping && selectedShowcase ? (
-                <div className="mt-10 rounded-[34px] border border-[#dbe5ef] bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(243,247,251,0.92)_100%)] p-6 shadow-[0_24px_60px_rgba(148,163,184,0.14)] md:p-8">
+                <div className="mt-10 border-t border-[#e3e9f1] pt-8 md:pt-10">
                   <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                     <div className="max-w-2xl">
                       <p className="font-mono text-[11px] font-bold uppercase tracking-[0.34em] text-[#7c8da5]">Selected package</p>

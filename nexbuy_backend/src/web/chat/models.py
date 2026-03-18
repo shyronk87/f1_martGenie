@@ -18,6 +18,12 @@ class ChatSessionRecord(Base):
         nullable=False,
         index=True,
     )
+    project_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("chat_projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", nullable=False)
     last_user_message: Mapped[str | None] = mapped_column(Text, nullable=True)

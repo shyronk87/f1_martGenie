@@ -10,6 +10,15 @@ import {
   saveAuthUserEmail,
 } from "@/lib/auth";
 import { fetchChatHistory } from "@/lib/chat-api";
+import {
+  createProject,
+  fetchProjects,
+  readSelectedProjectId,
+  readSelectedProjectServerSnapshot,
+  saveSelectedProjectId,
+  subscribeSelectedProject,
+  type ProjectItem,
+} from "@/lib/project-api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -60,6 +69,7 @@ export default function WorkspaceShell({
 }: WorkspaceShellProps) {
   const router = useRouter();
   const [selectedHistoryId, setSelectedHistoryId] = useState("current");
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [remoteHistoryItems, setRemoteHistoryItems] = useState<HistoryItem[]>([]);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
@@ -73,11 +83,20 @@ export default function WorkspaceShell({
     readAuthUserEmailSnapshot,
     readAuthUserEmailServerSnapshot,
   );
+  const selectedProjectId = useSyncExternalStore(
+    subscribeSelectedProject,
+    readSelectedProjectId,
+    readSelectedProjectServerSnapshot,
+  );
   const effectiveAuthenticated = isAuthenticated || Boolean(authToken);
 
   const historyItems = useMemo<HistoryItem[]>(
     () => (effectiveAuthenticated ? remoteHistoryItems : []),
     [effectiveAuthenticated, remoteHistoryItems],
+  );
+  const displayProjects = useMemo<ProjectItem[]>(
+    () => (effectiveAuthenticated ? projects : []),
+    [effectiveAuthenticated, projects],
   );
   const displayEmail = effectiveAuthenticated ? authUserEmail || "Signed in" : "";
 
@@ -90,7 +109,7 @@ export default function WorkspaceShell({
 
     async function loadHistory() {
       try {
-        const sessions = await fetchChatHistory();
+        const sessions = await fetchChatHistory(selectedProjectId || undefined);
         if (cancelled) {
           return;
         }
@@ -123,7 +142,37 @@ export default function WorkspaceShell({
       window.removeEventListener(CHAT_HISTORY_REFRESH_EVENT, handleRefresh);
       window.removeEventListener("focus", handleRefresh);
     };
-  }, [effectiveAuthenticated]);
+  }, [effectiveAuthenticated, selectedProjectId]);
+
+  useEffect(() => {
+    if (!effectiveAuthenticated) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadProjects() {
+      try {
+        const items = await fetchProjects();
+        if (cancelled) {
+          return;
+        }
+        setProjects(items);
+        if ((!selectedProjectId || !items.some((item) => item.id === selectedProjectId)) && items[0]?.id) {
+          saveSelectedProjectId(items[0].id);
+        }
+      } catch {
+        if (!cancelled) {
+          setProjects([]);
+        }
+      }
+    }
+
+    void loadProjects();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveAuthenticated, selectedProjectId]);
 
   useEffect(() => {
     if (!effectiveAuthenticated) {
@@ -172,6 +221,22 @@ export default function WorkspaceShell({
     router.push("/chat");
   }
 
+  function handleNewProject() {
+    if (!effectiveAuthenticated) {
+      onOpenAuth();
+      return;
+    }
+
+    void createProject({
+      title: `New project ${projects.length + 1}`,
+      summary: "Untitled shopping workspace",
+    }).then((nextProject) => {
+      setProjects((current) => [nextProject, ...current]);
+      saveSelectedProjectId(nextProject.id);
+      router.push("/chat");
+    });
+  }
+
   const avatarLabel = useMemo(() => {
     const base = authUserEmail.trim().slice(0, 2);
     return base.length > 0 ? base.toUpperCase() : "NX";
@@ -191,9 +256,9 @@ export default function WorkspaceShell({
                   MartGennie
                 </p>
               </Link>
-              <div className="mt-5 -mx-4 h-px bg-[#e2e8f0]" />
-              <div className="pt-5">
-                <div className="space-y-1">
+            <div className="mt-5 -mx-4 h-px bg-[#e2e8f0]" />
+            <div className="pt-5">
+              <div className="space-y-1">
                 <button
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
                   onClick={handleNewConversation}
@@ -202,6 +267,51 @@ export default function WorkspaceShell({
                   <span className="text-base leading-none">+</span>
                   <span>New chat</span>
                 </button>
+
+                <div className="space-y-2 pt-3">
+                  <div className="flex items-center justify-between px-3 pb-1">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#98a2b3]">
+                      Projects
+                    </span>
+                    <button
+                      className="inline-flex h-7 items-center justify-center rounded-full px-2.5 text-[11px] font-semibold text-[#486480] transition hover:bg-[#eef4fb] hover:text-[#123b5f]"
+                      onClick={handleNewProject}
+                      type="button"
+                    >
+                      + New project
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {displayProjects.map((project) => (
+                      <button
+                        className={`block w-full rounded-[16px] px-3 py-2 text-left transition ${
+                          selectedProjectId === project.id
+                            ? "bg-[#edf5ff] text-[#123b5f]"
+                            : "text-[#526173] hover:bg-[#f4f7fb]"
+                        }`}
+                        key={project.id}
+                        onClick={() => {
+                          saveSelectedProjectId(project.id);
+                          router.push("/chat");
+                        }}
+                        type="button"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{project.title}</p>
+                            <p className="mt-1 truncate text-xs leading-5 text-[#7b8798]">
+                              {project.summary || "Untitled shopping workspace"}
+                            </p>
+                          </div>
+                          <span className="shrink-0 pt-0.5 text-[11px] text-[#98a2b3]">
+                            {new Date(project.updated_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <nav className="space-y-1 pt-2">
                   <span className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#98a2b3]">
                     Navigation
@@ -220,8 +330,8 @@ export default function WorkspaceShell({
                     </Link>
                   ))}
                 </nav>
-                </div>
               </div>
+            </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3">

@@ -10,10 +10,17 @@ import type {
 
 type SessionResponse = { session_id: string };
 type SendMessageResponse = { message_id: string; task_id: string; status: string };
-type HistoryItemResponse = { session_id: string; title: string; preview: string; updated_at: string };
+type HistoryItemResponse = {
+  session_id: string;
+  project_id?: string | null;
+  title: string;
+  preview: string;
+  updated_at: string;
+};
 type HistoryResponse = { sessions: HistoryItemResponse[] };
 type SessionDumpResponse = {
   session_id: string;
+  project_id?: string | null;
   messages: ChatMessage[];
   timeline: TimelineEvent[];
   plans: PlanOption[];
@@ -32,11 +39,15 @@ function getChatStreamBaseUrl() {
   return `${configuredOrigin.replace(/\/+$/, "")}/api`;
 }
 
-export async function createChatSession(): Promise<string> {
+export async function createChatSession(projectId?: string | null): Promise<string> {
   if (chatMode === "real") {
     const response = await fetch(`${getApiBaseUrl()}/chat/sessions`, {
       method: "POST",
-      headers: buildAuthHeaders(),
+      headers: {
+        ...buildAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ project_id: projectId ?? null }),
     });
     const payload = await parseJsonResponse<SessionResponse>(
       response,
@@ -48,8 +59,12 @@ export async function createChatSession(): Promise<string> {
   return `mock-${crypto.randomUUID()}`;
 }
 
-export async function fetchChatHistory(): Promise<HistoryItemResponse[]> {
-  const response = await fetch(`${getApiBaseUrl()}/chat/history`, {
+export async function fetchChatHistory(projectId?: string | null): Promise<HistoryItemResponse[]> {
+  const url = new URL(`${getApiBaseUrl()}/chat/history`);
+  if (projectId) {
+    url.searchParams.set("project_id", projectId);
+  }
+  const response = await fetch(url.toString(), {
     headers: buildAuthHeaders(),
   });
   const payload = await parseJsonResponse<HistoryResponse>(

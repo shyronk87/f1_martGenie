@@ -24,6 +24,7 @@ import {
   saveMemoryProfile,
   type OnboardingQuestion,
 } from "@/lib/memory-api";
+import { readSelectedProjectId, saveSelectedProjectId } from "@/lib/project-api";
 import AuthModal from "@/src/components/AuthModal";
 import MemoryQuestionStepper from "@/src/components/MemoryQuestionStepper";
 import WorkspaceShell from "@/src/components/WorkspaceShell";
@@ -34,6 +35,7 @@ type FriendlyEvent = {
 };
 
 type SavedWorkspaceState = {
+  projectId?: string | null;
   sessionId: string | null;
   messages: ChatMessage[];
   timeline: TimelineEvent[];
@@ -214,9 +216,10 @@ function normalizeWorkspace(raw: SavedWorkspaceState | null) {
     return null;
   }
 
-  return {
-    sessionId: raw.sessionId ?? null,
-    messages: Array.isArray(raw.messages) ? raw.messages : [],
+    return {
+      projectId: raw.projectId ?? null,
+      sessionId: raw.sessionId ?? null,
+      messages: Array.isArray(raw.messages) ? raw.messages : [],
     timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
     plans: Array.isArray(raw.plans) ? raw.plans : [],
     packageSnapshots:
@@ -334,6 +337,9 @@ export default function ChatWorkspacePage() {
         if (cancelled) {
           return;
         }
+        if (dump.project_id) {
+          saveSelectedProjectId(dump.project_id);
+        }
         setSessionId(dump.session_id);
         setMessages(dump.messages);
         setTimeline([]);
@@ -377,6 +383,7 @@ export default function ChatWorkspacePage() {
     }
 
     const payload: SavedWorkspaceState = {
+      projectId: readSelectedProjectId() || null,
       sessionId,
       messages,
       timeline,
@@ -473,7 +480,7 @@ export default function ChatWorkspacePage() {
             setStatus("Restoring saved workspace...");
             return;
           }
-          const createdSessionId = await createChatSession();
+          const createdSessionId = await createChatSession(readSelectedProjectId() || undefined);
           if (unmounted) {
             return;
           }
@@ -732,7 +739,7 @@ export default function ChatWorkspacePage() {
     try {
       await saveMemoryProfile(buildMemoryPayloadFromAnswers(onboardingAnswers));
 
-      const createdSessionId = await createChatSession();
+      const createdSessionId = await createChatSession(readSelectedProjectId() || undefined);
       setSessionId(createdSessionId);
       setShowOnboarding(false);
       setStatus("Memory saved. Workspace ready.");

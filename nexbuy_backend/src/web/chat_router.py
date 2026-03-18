@@ -161,6 +161,11 @@ class ChatMessageIn(BaseModel):
 
 class SessionCreateResponse(BaseModel):
     session_id: str
+    project_id: str | None = None
+
+
+class SessionCreateIn(BaseModel):
+    project_id: str | None = None
 
 
 class SendMessageResponse(BaseModel):
@@ -171,6 +176,7 @@ class SendMessageResponse(BaseModel):
 
 class SessionDumpResponse(BaseModel):
     session_id: str
+    project_id: str | None = None
     messages: list[dict[str, Any]]
     timeline: list[dict[str, Any]]
     plans: list[dict[str, Any]]
@@ -215,6 +221,7 @@ COMPOSE_TIMEOUT_SECONDS = 120
 
 @router.post("/sessions", response_model=SessionCreateResponse)
 async def create_session(
+    payload: SessionCreateIn | None = None,
     user: User = Depends(CurrentActiveUser),
     db_session: AsyncSession = Depends(get_async_session),
 ) -> SessionCreateResponse:
@@ -225,16 +232,22 @@ async def create_session(
         "plans": [],
         "user_id": str(user.id),
     }
-    await create_chat_session_record(db_session, user.id, session_id)
-    return SessionCreateResponse(session_id=session_id)
+    row = await create_chat_session_record(
+        db_session,
+        user.id,
+        session_id,
+        payload.project_id if payload else None,
+    )
+    return SessionCreateResponse(session_id=session_id, project_id=row.project_id)
 
 
 @router.get("/history", response_model=ChatHistoryListOut)
 async def get_chat_history(
+    project_id: str | None = Query(default=None),
     user: User = Depends(CurrentActiveUser),
     db_session: AsyncSession = Depends(get_async_session),
 ) -> ChatHistoryListOut:
-    return await load_chat_history(db_session, user.id)
+    return await load_chat_history(db_session, user.id, project_id=project_id)
 
 
 @router.post("/sessions/{session_id}/messages", response_model=SendMessageResponse, status_code=202)

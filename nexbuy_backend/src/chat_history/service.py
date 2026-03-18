@@ -8,6 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat_history.schema import ChatHistoryItemOut, ChatHistoryListOut
+from src.projects.service import ensure_default_project, get_project, touch_project_activity
 from src.web.chat.models import (
     ChatMessageRecord,
     ChatPackageSnapshotRecord,
@@ -35,16 +36,35 @@ def _session_title_from_message(message: str) -> str:
     return compact[:72]
 
 
-async def create_chat_session(session: AsyncSession, user_id: UUID, session_id: str) -> None:
+async def create_chat_session(
+    session: AsyncSession,
+    user_id: UUID,
+    session_id: str,
+    project_id: str | None = None,
+) -> ChatSessionRecord:
+    if project_id:
+        project_row = await get_project(session, user_id, project_id)
+        if project_row is None:
+            raise ValueError("Project not found.")
+    else:
+        project_row = await ensure_default_project(session, user_id)
+        project_id = project_row.id
+
     row = ChatSessionRecord(
         id=session_id,
         user_id=user_id,
+        project_id=project_id,
         title="New workspace",
         status="draft",
         last_activity_at=_now(),
     )
     session.add(row)
     await session.commit()
+    await session.refresh(row)
+    if row.project_id:
+        await touch_project_activity(session, row.project_id)
+        await session.commit()
+    return row
 
 
 async def get_chat_session_row(
@@ -92,6 +112,8 @@ async def append_user_message(
     session_row.last_user_message = content
     session_row.status = "running"
     session_row.last_activity_at = _now()
+    if session_row.project_id:
+        await touch_project_activity(session, session_row.project_id)
     await session.commit()
 
 
@@ -139,6 +161,8 @@ async def persist_assistant_message(
             snapshot_row.message_id = message_id
     session_row.last_assistant_message = content
     session_row.last_activity_at = _now()
+    if session_row.project_id:
+        await touch_project_activity(session, session_row.project_id)
     await session.commit()
 
 
@@ -163,6 +187,8 @@ async def persist_package_snapshot(
         )
     )
     session_row.last_activity_at = _now()
+    if session_row.project_id:
+        await touch_project_activity(session, session_row.project_id)
     await session.commit()
 
 
@@ -225,6 +251,8 @@ async def replace_session_plans(
     session_row.active_plan_id = str(plans[0]["id"]) if plans else None
     session_row.status = "completed" if plans else session_row.status
     session_row.last_activity_at = _now()
+    if session_row.project_id:
+        await touch_project_activity(session, session_row.project_id)
     await session.commit()
 
 
@@ -234,14 +262,24 @@ async def mark_session_failed(session: AsyncSession, user_id: UUID, session_id: 
         return
     session_row.status = "failed"
     session_row.last_activity_at = _now()
+    if session_row.project_id:
+        await touch_project_activity(session, session_row.project_id)
     await session.commit()
 
 
-async def load_chat_history(session: AsyncSession, user_id: UUID) -> ChatHistoryListOut:
+async def load_chat_history(session: AsyncSession, user_id: UUID, project_id: str | None = None) -> ChatHistoryListOut:
+    if project_id:
+        project_row = await get_project(session, user_id, project_id)
+        if project_row is None:
+            return ChatHistoryListOut(sessions=[])
+        effective_project_id = project_id
+    else:
+        effective_project_id = (await ensure_default_project(session, user_id)).id
+
     rows = (
         await session.scalars(
             select(ChatSessionRecord)
-            .where(ChatSessionRecord.user_id == user_id)
+            .where(ChatSessionRecord.user_id == user_id, ChatSessionRecord.project_id == effective_project_id)
             .order_by(ChatSessionRecord.last_activity_at.desc(), ChatSessionRecord.created_at.desc())
             .limit(30)
         )
@@ -251,6 +289,7 @@ async def load_chat_history(session: AsyncSession, user_id: UUID) -> ChatHistory
         sessions=[
             ChatHistoryItemOut(
                 session_id=row.id,
+                project_id=row.project_id,
                 title=row.title or "New workspace",
                 preview=_preview_text(row.last_user_message, row.last_assistant_message),
                 updated_at=row.last_activity_at.isoformat(),
@@ -331,6 +370,7 @@ async def load_chat_session_dump(
 
     return {
         "session_id": session_id,
+        "project_id": session_row.project_id,
         "messages": [
             {
                 "id": row.id,

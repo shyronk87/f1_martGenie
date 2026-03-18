@@ -463,6 +463,34 @@ export default function RecommendationsPage() {
                         {activePlan.items.map((item) => (
                           <div className="space-y-3" key={`${activePlan.id}-${item.sku}`}>
                             <article className="group relative flex h-full flex-col rounded-[24px] border border-[#dde5ef] bg-white p-4 shadow-[0_12px_32px_rgba(148,163,184,0.08)]">
+                              <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+                                  {item.categoryLabel || "Product"}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    aria-label="Share by email"
+                                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d4dce7] bg-white text-[15px] text-[#344054] shadow-[0_10px_20px_rgba(148,163,184,0.1)] transition hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
+                                    onClick={() => handleOpenShare(item.sku, item.title)}
+                                    type="button"
+                                  >
+                                    ✉
+                                  </button>
+                                  <button
+                                    aria-label={favoriteSkuSet.has(item.sku) ? "Remove from likes" : "Add to likes"}
+                                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[15px] shadow-[0_10px_20px_rgba(148,163,184,0.1)] transition ${
+                                      favoriteSkuSet.has(item.sku)
+                                        ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                                        : "border-[#d4dce7] bg-white text-[#344054] hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
+                                    }`}
+                                    disabled={isUpdatingFavoriteSku === item.sku}
+                                    onClick={() => void handleToggleFavorite(item)}
+                                    type="button"
+                                  >
+                                    ♥
+                                  </button>
+                                </div>
+                              </div>
                               {item.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
@@ -546,7 +574,7 @@ export default function RecommendationsPage() {
                                 </div>
                               ) : null}
                             </article>
-                            <div className="grid grid-cols-[1fr_auto_auto] gap-3">
+                            <div className="grid grid-cols-[1fr] gap-3">
                               <Link
                                 className="group flex items-center justify-between rounded-[18px] border border-[#cfe0f5] bg-[linear-gradient(135deg,#0f172a_0%,#172554_42%,#2563eb_100%)] px-4 py-2.5 text-white shadow-[0_16px_38px_rgba(37,99,235,0.24)] transition hover:scale-[1.01] hover:shadow-[0_20px_48px_rgba(37,99,235,0.3)]"
                                 href={`/negotiation?sku=${encodeURIComponent(item.sku)}&title=${encodeURIComponent(item.title)}&price=${encodeURIComponent(String(item.price))}&imageUrl=${encodeURIComponent(item.imageUrl ?? "")}&planId=${encodeURIComponent(activePlan.id)}&planTitle=${encodeURIComponent(activePlan.title)}&sessionId=${encodeURIComponent(workspaceState?.sessionId ?? "")}`}
@@ -569,26 +597,6 @@ export default function RecommendationsPage() {
                                   </span>
                                 </div>
                               </Link>
-                              <button
-                                className="inline-flex items-center justify-center rounded-[18px] border border-[#d4dce7] bg-white px-4 py-2.5 text-sm font-semibold text-[#344054] shadow-[0_10px_24px_rgba(148,163,184,0.1)] transition hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
-                                onClick={() => handleOpenShare(item.sku, item.title)}
-                                type="button"
-                              >
-                                Share
-                              </button>
-                              <button
-                                aria-label={favoriteSkuSet.has(item.sku) ? "Remove from likes" : "Add to likes"}
-                                className={`inline-flex items-center justify-center rounded-[18px] border px-4 py-2.5 text-base font-semibold shadow-[0_10px_24px_rgba(148,163,184,0.1)] transition ${
-                                  favoriteSkuSet.has(item.sku)
-                                    ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                                    : "border-[#d4dce7] bg-white text-[#344054] hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
-                                }`}
-                                disabled={isUpdatingFavoriteSku === item.sku}
-                                onClick={() => void handleToggleFavorite(item)}
-                                type="button"
-                              >
-                                ♥
-                              </button>
                             </div>
                           </div>
                         ))}

@@ -489,6 +489,34 @@ export default function PlazaPage() {
     return (
       <div className="flex h-full flex-col gap-3" key={product.sku_id_default}>
         <article className="group relative z-0 flex flex-1 flex-col overflow-visible rounded-[28px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.14)] transition duration-300 hover:z-30 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.16)]">
+          <div className="flex items-center justify-between gap-3 px-5 pt-5">
+            <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+              {categoryLabel || buildRecommendationGroupLabel(product)}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="Share by email"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d4dce7] bg-white text-[15px] text-[#344054] shadow-[0_10px_20px_rgba(148,163,184,0.1)] transition hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
+                onClick={() => handleOpenShare(product)}
+                type="button"
+              >
+                ✉
+              </button>
+              <button
+                aria-label={favoriteSkuSet.has(product.sku_id_default) ? "Remove from likes" : "Add to likes"}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[15px] shadow-[0_10px_20px_rgba(148,163,184,0.1)] transition ${
+                  favoriteSkuSet.has(product.sku_id_default)
+                    ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
+                    : "border-[#d4dce7] bg-white text-[#344054] hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
+                }`}
+                disabled={isUpdatingFavoriteSku === product.sku_id_default}
+                onClick={() => void handleToggleFavorite(product)}
+                type="button"
+              >
+                ♥
+              </button>
+            </div>
+          </div>
           <div className="relative h-56 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
             {product.main_image_url ? (
@@ -564,7 +592,7 @@ export default function PlazaPage() {
             ) : null}
           </div>
         </article>
-        <div className="grid grid-cols-[1fr_auto_auto] gap-3">
+        <div className="grid grid-cols-[1fr] gap-3">
           <button
             className="group/order relative inline-flex h-11 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-4 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition duration-200 hover:-translate-y-0.5 hover:brightness-105 hover:shadow-[0_16px_38px_rgba(15,23,42,0.22)]"
             onClick={() => handlePlaceProductOrder(product)}
@@ -572,26 +600,6 @@ export default function PlazaPage() {
           >
             <span className="absolute inset-0 rounded-[16px] bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)] opacity-0 transition duration-300 group-hover/order:opacity-100" />
             <span className="relative">Place order</span>
-          </button>
-          <button
-            className="inline-flex h-11 items-center justify-center rounded-[16px] border border-[#d4dce7] bg-white px-4 text-sm font-semibold text-[#344054] shadow-[0_10px_24px_rgba(148,163,184,0.1)] transition hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
-            onClick={() => handleOpenShare(product)}
-            type="button"
-          >
-            Share
-          </button>
-          <button
-            aria-label={favoriteSkuSet.has(product.sku_id_default) ? "Remove from likes" : "Add to likes"}
-            className={`inline-flex h-11 items-center justify-center rounded-[16px] border px-4 text-base font-semibold shadow-[0_10px_24px_rgba(148,163,184,0.1)] transition ${
-              favoriteSkuSet.has(product.sku_id_default)
-                ? "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]"
-                : "border-[#d4dce7] bg-white text-[#344054] hover:-translate-y-0.5 hover:border-[#c7d2e2] hover:bg-[#f8fafc]"
-            }`}
-            disabled={isUpdatingFavoriteSku === product.sku_id_default}
-            onClick={() => void handleToggleFavorite(product)}
-            type="button"
-          >
-            ♥
           </button>
         </div>
       </div>

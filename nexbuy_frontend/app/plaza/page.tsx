@@ -129,6 +129,7 @@ export default function PlazaPage() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isDeletingFeedbackId, setIsDeletingFeedbackId] = useState<string | null>(null);
   const [isLikingFeedbackId, setIsLikingFeedbackId] = useState<string | null>(null);
+  const [likePulseId, setLikePulseId] = useState<string | null>(null);
   const [feedbackPage, setFeedbackPage] = useState(1);
   const [feedbackTotalPages, setFeedbackTotalPages] = useState(1);
 
@@ -336,6 +337,7 @@ export default function PlazaPage() {
     try {
       setIsLikingFeedbackId(feedbackId);
       setFeedbackError("");
+      setLikePulseId(feedbackId);
       const updated = await toggleMartGennieFeedbackLike(feedbackId);
       setFeedbackItems((current) =>
         current.map((item) =>
@@ -354,6 +356,9 @@ export default function PlazaPage() {
       );
     } finally {
       setIsLikingFeedbackId(null);
+      window.setTimeout(() => {
+        setLikePulseId((current) => (current === feedbackId ? null : current));
+      }, 380);
     }
   }
 
@@ -771,15 +776,30 @@ export default function PlazaPage() {
                           ) : null}
                         </div>
                         <button
-                          className={`inline-flex items-center gap-2 text-sm transition ${
+                          className={`relative inline-flex items-center gap-2 text-sm transition ${
                             entry.current_user_liked ? "text-[#1d4ed8]" : "text-[#667085]"
                           } disabled:cursor-not-allowed disabled:opacity-60`}
                           disabled={!isAuthenticated || isLikingFeedbackId === entry.id}
                           onClick={() => void handleToggleLike(entry.id)}
                           type="button"
                         >
-                          <span className="text-lg leading-none">👍</span>
-                          <span>{entry.likes_count}</span>
+                          {likePulseId === entry.id ? (
+                            <span className="pointer-events-none absolute left-0 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full bg-[#bfdbfe]/70 animate-ping" />
+                          ) : null}
+                          <span
+                            className={`relative text-xl leading-none transition duration-200 ${
+                              likePulseId === entry.id ? "scale-125 -rotate-6" : "scale-100"
+                            }`}
+                          >
+                            👍
+                          </span>
+                          <span
+                            className={`relative transition duration-200 ${
+                              likePulseId === entry.id ? "scale-110 font-bold text-[#1d4ed8]" : ""
+                            }`}
+                          >
+                            {entry.likes_count}
+                          </span>
                         </button>
                       </div>
                     </article>

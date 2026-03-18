@@ -9,7 +9,8 @@ import WorkspaceShell from "@/src/components/WorkspaceShell";
 
 type SellerDraft = {
   title: string;
-  category: string;
+  roomPlacement: string;
+  productType: string;
   description: string;
   imageUrl: string;
   imageName: string;
@@ -20,13 +21,23 @@ type SellerDraft = {
   specNarrative: string;
 };
 
-const CATEGORY_OPTIONS = [
+const ROOM_OPTIONS = [
   "Living room",
   "Dining room",
   "Bedroom",
   "Outdoor",
   "Lighting",
   "Storage",
+];
+
+const PRODUCT_TYPE_OPTIONS = [
+  "Sofa",
+  "Chair",
+  "Table",
+  "Coffee table",
+  "Bed",
+  "Storage cabinet",
+  "Lighting",
 ];
 
 const URGENCY_OPTIONS: Array<{ value: SellerDraft["urgency"]; label: string; description: string }> = [
@@ -37,7 +48,8 @@ const URGENCY_OPTIONS: Array<{ value: SellerDraft["urgency"]; label: string; des
 
 const INITIAL_DRAFT: SellerDraft = {
   title: "",
-  category: "Living room",
+  roomPlacement: "Living room",
+  productType: "Sofa",
   description: "",
   imageUrl: "",
   imageName: "",
@@ -276,14 +288,14 @@ export default function SellerConsolePage() {
                         <div className="grid gap-4 md:grid-cols-2">
                           <label className="block">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
-                              Category
+                              Best room fit
                             </span>
                             <select
                               className="h-12 w-full rounded-[18px] border border-[#d7dfe9] bg-white px-4 text-sm text-[#101828] outline-none transition focus:border-[#7aa2d8]"
-                              onChange={(event) => updateDraft("category", event.target.value)}
-                              value={draft.category}
+                              onChange={(event) => updateDraft("roomPlacement", event.target.value)}
+                              value={draft.roomPlacement}
                             >
-                              {CATEGORY_OPTIONS.map((option) => (
+                              {ROOM_OPTIONS.map((option) => (
                                 <option key={option} value={option}>
                                   {option}
                                 </option>
@@ -293,16 +305,16 @@ export default function SellerConsolePage() {
 
                           <label className="block">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
-                              Inventory priority
+                              Product category
                             </span>
                             <select
                               className="h-12 w-full rounded-[18px] border border-[#d7dfe9] bg-white px-4 text-sm text-[#101828] outline-none transition focus:border-[#7aa2d8]"
-                              onChange={(event) => updateDraft("urgency", event.target.value as SellerDraft["urgency"])}
-                              value={draft.urgency}
+                              onChange={(event) => updateDraft("productType", event.target.value)}
+                              value={draft.productType}
                             >
-                              {URGENCY_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
+                              {PRODUCT_TYPE_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
                                 </option>
                               ))}
                             </select>
@@ -374,6 +386,23 @@ export default function SellerConsolePage() {
                         />
                       </label>
                     </div>
+
+                    <label className="mt-4 block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+                        Inventory priority
+                      </span>
+                      <select
+                        className="h-12 w-full rounded-[18px] border border-[#d7dfe9] bg-white px-4 text-sm text-[#101828] outline-none transition focus:border-[#7aa2d8]"
+                        onChange={(event) => updateDraft("urgency", event.target.value as SellerDraft["urgency"])}
+                        value={draft.urgency}
+                      >
+                        {URGENCY_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </section>
 
                   <section className="rounded-[28px] border border-[#e4e9f1] bg-white px-5 py-5">
@@ -441,7 +470,9 @@ export default function SellerConsolePage() {
 
                       <div className="space-y-4 px-5 py-5">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b97a8]">{draft.category}</p>
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b97a8]">
+                            {draft.roomPlacement} / {draft.productType}
+                          </p>
                           <h3 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[#101828]">
                             {draft.title || "Your draft title will appear here"}
                           </h3>

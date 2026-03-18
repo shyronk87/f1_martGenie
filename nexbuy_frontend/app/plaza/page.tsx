@@ -14,6 +14,7 @@ import {
   fetchPlazaShowcases,
   seedMockPlazaShowcases,
   type MartGennieFeedbackItem,
+  toggleMartGennieFeedbackLike,
   type PlazaRecommendationProduct,
   type PlazaRecommendations,
   type PlazaShowcaseDetail,
@@ -123,8 +124,13 @@ export default function PlazaPage() {
   const [feedbackItems, setFeedbackItems] = useState<MartGennieFeedbackItem[]>([]);
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackDraft, setFeedbackDraft] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackImages, setFeedbackImages] = useState<string[]>([]);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isDeletingFeedbackId, setIsDeletingFeedbackId] = useState<string | null>(null);
+  const [isLikingFeedbackId, setIsLikingFeedbackId] = useState<string | null>(null);
+  const [feedbackPage, setFeedbackPage] = useState(1);
+  const [feedbackTotalPages, setFeedbackTotalPages] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,58 +180,16 @@ export default function PlazaPage() {
                 );
               }
             }
-            try {
-              const feedbackPayload = await fetchMartGennieFeedback();
-              if (!cancelled) {
-                setFeedbackItems(feedbackPayload.items);
-              }
-            } catch (feedbackLoadError) {
-              if (!cancelled) {
-                setFeedbackError(
-                  feedbackLoadError instanceof Error
-                    ? feedbackLoadError.message
-                    : "Could not load user feedback.",
-                );
-              }
-            }
           } catch {
             if (!cancelled) {
               setIsAuthenticated(false);
               setRecommendations(null);
-              try {
-                const feedbackPayload = await fetchMartGennieFeedback();
-                if (!cancelled) {
-                  setFeedbackItems(feedbackPayload.items);
-                }
-              } catch (feedbackLoadError) {
-                if (!cancelled) {
-                  setFeedbackError(
-                    feedbackLoadError instanceof Error
-                      ? feedbackLoadError.message
-                      : "Could not load user feedback.",
-                  );
-                }
-              }
             }
           }
         } else {
           if (!cancelled) {
             setIsAuthenticated(false);
             setRecommendations(null);
-          }
-          try {
-            const feedbackPayload = await fetchMartGennieFeedback();
-            if (!cancelled) {
-              setFeedbackItems(feedbackPayload.items);
-            }
-          } catch (feedbackLoadError) {
-            if (!cancelled) {
-              setFeedbackError(
-                feedbackLoadError instanceof Error
-                  ? feedbackLoadError.message
-                  : "Could not load user feedback.",
-              );
-            }
           }
         }
       } catch (bootstrapError) {
@@ -245,6 +209,36 @@ export default function PlazaPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFeedbackPage() {
+      try {
+        setFeedbackError("");
+        const payload = await fetchMartGennieFeedback(feedbackPage, 5);
+        if (cancelled) {
+          return;
+        }
+        setFeedbackItems(payload.items);
+        setFeedbackTotalPages(payload.total_pages);
+      } catch (feedbackLoadError) {
+        if (cancelled) {
+          return;
+        }
+        setFeedbackError(
+          feedbackLoadError instanceof Error
+            ? feedbackLoadError.message
+            : "Could not load user feedback.",
+        );
+      }
+    }
+
+    void loadFeedbackPage();
+    return () => {
+      cancelled = true;
+    };
+  }, [feedbackPage, isAuthenticated]);
 
   async function handleSelectShowcase(showcaseId: string) {
     try {
@@ -305,9 +299,15 @@ export default function PlazaPage() {
       setFeedbackError("");
       const created = await createMartGennieFeedback({
         feedback_text: feedbackDraft.trim(),
+        rating: feedbackRating,
+        image_urls: feedbackImages,
       });
-      setFeedbackItems((current) => [created, ...current].slice(0, 9));
+      setFeedbackPage(1);
+      setFeedbackItems((current) => [created, ...current].slice(0, 5));
+      setFeedbackTotalPages((current) => Math.max(current, 1));
       setFeedbackDraft("");
+      setFeedbackRating(5);
+      setFeedbackImages([]);
     } catch (submitError) {
       setFeedbackError(
         submitError instanceof Error ? submitError.message : "Could not publish your feedback.",
@@ -330,6 +330,76 @@ export default function PlazaPage() {
     } finally {
       setIsDeletingFeedbackId(null);
     }
+  }
+
+  async function handleToggleLike(feedbackId: string) {
+    try {
+      setIsLikingFeedbackId(feedbackId);
+      setFeedbackError("");
+      const updated = await toggleMartGennieFeedbackLike(feedbackId);
+      setFeedbackItems((current) =>
+        current.map((item) =>
+          item.id === feedbackId
+            ? {
+                ...item,
+                likes_count: updated.likes_count,
+                current_user_liked: updated.current_user_liked,
+              }
+            : item,
+        ),
+      );
+    } catch (likeError) {
+      setFeedbackError(
+        likeError instanceof Error ? likeError.message : "Could not update feedback like.",
+      );
+    } finally {
+      setIsLikingFeedbackId(null);
+    }
+  }
+
+  function renderStars(value: number, interactive = false, onSelect?: (next: number) => void) {
+    return (
+      <div className="flex items-center gap-1.5">
+        {Array.from({ length: 5 }).map((_, index) => {
+          const starValue = index + 1;
+          return (
+            <button
+              className={`text-lg leading-none ${starValue <= value ? "text-amber-400" : "text-[#cbd5e1]"} ${
+                interactive ? "transition hover:scale-110" : "cursor-default"
+              }`}
+              disabled={!interactive}
+              key={starValue}
+              onClick={() => onSelect?.(starValue)}
+              type="button"
+            >
+              ★
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  async function handleFeedbackImagesChange(files: FileList | null) {
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const nextImages = await Promise.all(
+      Array.from(files)
+        .slice(0, 4)
+        .map(
+          (file) =>
+            new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+              reader.onerror = () => reject(new Error("Could not read feedback image."));
+              reader.readAsDataURL(file);
+            }),
+        ),
+    );
+
+    setFeedbackImages(nextImages.filter(Boolean));
   }
 
   function renderRecommendationCard(product: PlazaRecommendationProduct, index: number) {
@@ -656,19 +726,119 @@ export default function PlazaPage() {
                   </p>
                 </div>
 
+                <div className="mt-8 space-y-4">
+                  {feedbackItems.map((entry) => (
+                    <article
+                      className="rounded-[26px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] p-5 shadow-[0_12px_32px_rgba(148,163,184,0.1)]"
+                      key={entry.id}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-base font-bold text-[#0f172a]">{entry.user_display_masked}</p>
+                          <div className="mt-2">{renderStars(entry.rating)}</div>
+                        </div>
+                      </div>
+                      <p className="mt-5 text-[15px] leading-8 text-[#344054]">&ldquo;{entry.feedback_text}&rdquo;</p>
+                      {entry.image_urls.length > 0 ? (
+                        <div className="mt-5 flex flex-wrap gap-3">
+                          {entry.image_urls.map((imageUrl, index) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              alt={`Feedback upload ${index + 1}`}
+                              className="h-20 w-20 rounded-[16px] object-cover"
+                              key={`${entry.id}-${index}`}
+                              src={imageUrl}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="mt-5 flex items-center justify-between gap-3 text-xs font-medium text-[#667085]">
+                        <div className="flex items-center gap-3">
+                          <span>{new Date(entry.created_at).toLocaleDateString()}</span>
+                          <button
+                            className={`transition ${entry.current_user_liked ? "text-[#1d4ed8]" : "text-[#667085]"} disabled:cursor-not-allowed disabled:opacity-60`}
+                            disabled={!isAuthenticated || isLikingFeedbackId === entry.id}
+                            onClick={() => void handleToggleLike(entry.id)}
+                            type="button"
+                          >
+                            {entry.current_user_liked ? "Liked" : "Like"} · {entry.likes_count}
+                          </button>
+                        </div>
+                        {entry.can_delete && entry.user_id === readAuthUserId() ? (
+                          <button
+                            className="text-[#b42318] transition hover:text-[#912018] disabled:cursor-not-allowed disabled:opacity-60"
+                            disabled={isDeletingFeedbackId === entry.id}
+                            onClick={() => void handleDeleteFeedback(entry.id)}
+                            type="button"
+                          >
+                            {isDeletingFeedbackId === entry.id ? "Deleting..." : "Delete"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex items-center justify-between">
+                  <p className="text-sm text-[#667085]">Page {feedbackPage} of {feedbackTotalPages}</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[#dce5ef] bg-white px-4 text-sm font-semibold text-[#3f5f87] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={feedbackPage <= 1}
+                      onClick={() => setFeedbackPage((current) => Math.max(current - 1, 1))}
+                      type="button"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      className="inline-flex h-10 items-center justify-center rounded-[14px] border border-[#dce5ef] bg-white px-4 text-sm font-semibold text-[#3f5f87] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={feedbackPage >= feedbackTotalPages}
+                      onClick={() => setFeedbackPage((current) => Math.min(current + 1, feedbackTotalPages))}
+                      type="button"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+
                 {isAuthenticated ? (
                   <div className="mt-8 rounded-[28px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.12)]">
                     <p className="text-sm font-semibold text-[#0f172a]">Share your experience</p>
+                    <div className="mt-3">{renderStars(feedbackRating, true, setFeedbackRating)}</div>
                     <textarea
-                      className="mt-3 h-28 w-full resize-none rounded-[20px] border border-[#dbe5ef] bg-white px-4 py-3 text-sm leading-7 text-[#101828] outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                      className="mt-4 h-28 w-full resize-none rounded-[20px] border border-[#dbe5ef] bg-white px-4 py-3 text-sm leading-7 text-[#101828] outline-none transition focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
                       onChange={(event) => setFeedbackDraft(event.target.value)}
                       placeholder="Tell other shoppers how MartGennie helped you choose, compare, or negotiate."
                       value={feedbackDraft}
                     />
+                    <div className="mt-4 flex items-center gap-4">
+                      <label className="inline-flex h-11 items-center justify-center rounded-[16px] border border-[#dce5ef] bg-white px-4 text-sm font-semibold text-[#3f5f87]">
+                        Upload image
+                        <input
+                          accept="image/*"
+                          className="hidden"
+                          multiple
+                          onChange={(event) => void handleFeedbackImagesChange(event.target.files)}
+                          type="file"
+                        />
+                      </label>
+                      <p className="text-sm text-[#667085]">Add up to 4 images if you want to attach a setup photo.</p>
+                    </div>
+                    {feedbackImages.length > 0 ? (
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        {feedbackImages.map((imageUrl, index) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            alt={`Selected upload ${index + 1}`}
+                            className="h-20 w-20 rounded-[16px] object-cover"
+                            key={`draft-${index}`}
+                            src={imageUrl}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
                     <div className="mt-4 flex items-center justify-between gap-4">
-                      <p className="text-sm text-[#667085]">
-                        Share a short note about how the recommendations or negotiation experience helped you.
-                      </p>
+                      <p className="text-sm text-[#667085]">Leave a clear review about the recommendation experience.</p>
                       <button
                         className="inline-flex h-11 shrink-0 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
                         disabled={isSubmittingFeedback}
@@ -691,53 +861,6 @@ export default function PlazaPage() {
                 {feedbackError && !isAuthenticated ? (
                   <p className="mt-4 text-sm font-medium text-[#b42318]">{feedbackError}</p>
                 ) : null}
-
-                <div className="mt-8 grid gap-5 lg:grid-cols-3">
-                  {feedbackItems.map((entry) => (
-                    <article
-                      className="rounded-[28px] border border-[#dce5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_100%)] p-5 shadow-[0_16px_40px_rgba(148,163,184,0.12)]"
-                      key={entry.id}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-base font-bold text-[#0f172a]">{entry.user_display_masked}</p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {entry.context_tags.map((tag) => (
-                              <span
-                                className="rounded-full border border-[#dbe5ef] bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-[#486480]"
-                                key={`${entry.id}-${tag}`}
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        {entry.outcome_label ? (
-                          <div className="rounded-full bg-[linear-gradient(180deg,#eaf2fb_0%,#dbeafe_100%)] px-3 py-1 text-xs font-bold text-[#1d4ed8]">
-                            {entry.outcome_label}
-                          </div>
-                        ) : null}
-                      </div>
-                      <p className="mt-5 text-[15px] leading-8 text-[#344054]">&ldquo;{entry.feedback_text}&rdquo;</p>
-                      <div className="mt-5 flex items-center justify-between gap-3 text-xs font-medium text-[#667085]">
-                        <div className="flex items-center gap-3">
-                          <span>{new Date(entry.created_at).toLocaleDateString()}</span>
-                          {entry.saved_amount > 0 ? <span>Saved {formatMoney(entry.saved_amount)}</span> : null}
-                        </div>
-                        {entry.user_id && entry.user_id === readAuthUserId() ? (
-                          <button
-                            className="text-[#b42318] transition hover:text-[#912018] disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={isDeletingFeedbackId === entry.id}
-                            onClick={() => void handleDeleteFeedback(entry.id)}
-                            type="button"
-                          >
-                            {isDeletingFeedbackId === entry.id ? "Deleting..." : "Delete"}
-                          </button>
-                        ) : null}
-                      </div>
-                    </article>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
@@ -764,9 +887,11 @@ export default function PlazaPage() {
             );
           }
           try {
-            const feedbackPayload = await fetchMartGennieFeedback();
+            const feedbackPayload = await fetchMartGennieFeedback(1, 5);
             setFeedbackItems(feedbackPayload.items);
             setFeedbackError("");
+            setFeedbackPage(feedbackPayload.page);
+            setFeedbackTotalPages(feedbackPayload.total_pages);
           } catch (feedbackLoadError) {
             setFeedbackError(
               feedbackLoadError instanceof Error

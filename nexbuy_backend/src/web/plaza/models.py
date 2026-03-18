@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -75,13 +75,55 @@ class MartGennieFeedbackRecord(Base):
     feedback_text: Mapped[str] = mapped_column(Text, nullable=False)
     context_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     outcome_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rating: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    image_urls: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     used_negotiation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     saved_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    likes_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_seeded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[Any] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+
+class MartGennieFeedbackLikeRecord(Base):
+    __tablename__ = "martgennie_feedback_like"
+    __table_args__ = (UniqueConstraint("feedback_id", "user_id", name="uq_martgennie_feedback_like"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    feedback_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("martgennie_feedback.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+async def ensure_plaza_feedback_schema(connection: Any) -> None:
+    await connection.execute(
+        text("ALTER TABLE martgennie_feedback ALTER COLUMN user_id DROP NOT NULL")
+    )
+    await connection.execute(
+        text("ALTER TABLE martgennie_feedback ADD COLUMN IF NOT EXISTS rating INTEGER NOT NULL DEFAULT 5")
+    )
+    await connection.execute(
+        text("ALTER TABLE martgennie_feedback ADD COLUMN IF NOT EXISTS image_urls JSON NOT NULL DEFAULT '[]'::json")
+    )
+    await connection.execute(
+        text("ALTER TABLE martgennie_feedback ADD COLUMN IF NOT EXISTS likes_count INTEGER NOT NULL DEFAULT 0")
+    )
+    await connection.execute(
+        text("ALTER TABLE martgennie_feedback ADD COLUMN IF NOT EXISTS is_seeded BOOLEAN NOT NULL DEFAULT FALSE")
     )

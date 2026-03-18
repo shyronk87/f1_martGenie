@@ -14,6 +14,7 @@ from .memory import models as _memory_models  # noqa: F401
 from .memory.router import router as memory_router
 from .negotiation_router import router as negotiation_router
 from .plaza import models as _plaza_models  # noqa: F401
+from .plaza.models import ensure_plaza_feedback_schema
 from .plaza.router import router as plaza_router
 from .profile import models as _profile_models  # noqa: F401
 from .profile.router import router as profile_router
@@ -23,6 +24,7 @@ from .profile.router import router as profile_router
 async def lifespan(_: FastAPI):
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+        await ensure_plaza_feedback_schema(connection)
     yield
 
 

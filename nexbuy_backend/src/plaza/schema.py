@@ -110,20 +110,28 @@ class MartGennieFeedbackItem(BaseModel):
     user_id: uuid.UUID | None = None
     user_display_masked: str
     feedback_text: str
-    context_tags: list[str] = Field(default_factory=list)
-    outcome_label: str | None = None
-    used_negotiation: bool = False
-    saved_amount: float = 0
+    rating: int = Field(ge=1, le=5)
+    image_urls: list[str] = Field(default_factory=list)
+    likes_count: int = 0
+    can_delete: bool = False
+    current_user_liked: bool = False
     created_at: datetime
 
 
 class MartGennieFeedbackCreateIn(BaseModel):
     feedback_text: str = Field(min_length=12, max_length=600)
-    context_tags: list[str] = Field(default_factory=list, max_length=4)
-    outcome_label: str | None = Field(default=None, max_length=80)
-    used_negotiation: bool = False
-    saved_amount: float = Field(default=0, ge=0, le=100000)
+    rating: int = Field(default=5, ge=1, le=5)
+    image_urls: list[str] = Field(default_factory=list, max_length=4)
 
 
 class MartGennieFeedbackListOut(BaseModel):
+    page: int = 1
+    page_size: int = 5
+    total_count: int = 0
+    total_pages: int = 0
     items: list[MartGennieFeedbackItem] = Field(default_factory=list)
+
+
+class MartGennieFeedbackLikeOut(BaseModel):
+    likes_count: int
+    current_user_liked: bool

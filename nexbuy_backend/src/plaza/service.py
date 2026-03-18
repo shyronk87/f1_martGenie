@@ -3,14 +3,19 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, func, select, text
+from sqlalchemy import Select, delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.model.memory import get_profile
 from src.model.query_data.db import query_products
 from src.model.query_data.schema import QueryFilters
 from src.web.auth.models import User
-from src.web.plaza.models import AgentShowcaseItemRecord, AgentShowcaseRecord, MartGennieFeedbackRecord
+from src.web.plaza.models import (
+    AgentShowcaseItemRecord,
+    AgentShowcaseRecord,
+    MartGennieFeedbackLikeRecord,
+    MartGennieFeedbackRecord,
+)
 
 from .schema import (
     AgentShowcaseCreateIn,
@@ -19,6 +24,7 @@ from .schema import (
     AgentShowcaseSummary,
     MartGennieFeedbackCreateIn,
     MartGennieFeedbackItem,
+    MartGennieFeedbackLikeOut,
     MartGennieFeedbackListOut,
     PlazaRecommendationProduct,
     PlazaRecommendationsOut,
@@ -120,10 +126,11 @@ def _default_feedback_items() -> list[MartGennieFeedbackItem]:
             user_id=None,
             user_display_masked=entry["user_display_masked"],
             feedback_text=entry["feedback_text"],
-            context_tags=list(entry["context_tags"]),
-            outcome_label=entry["outcome_label"],
-            used_negotiation=entry["used_negotiation"],
-            saved_amount=_money(entry["saved_amount"]),
+            rating=entry.get("rating", 5),
+            image_urls=[],
+            likes_count=entry.get("likes_count", 0),
+            can_delete=False,
+            current_user_liked=False,
             created_at=now,
         )
         for entry in DEFAULT_FEEDBACK_SEED
@@ -343,10 +350,33 @@ async def _fetch_seed_products(
     return [dict(row) for row in rows]
 
 
+def _feedback_item_from_record(
+    record: MartGennieFeedbackRecord,
+    *,
+    current_user_id: uuid.UUID | None,
+    liked_feedback_ids: set[uuid.UUID],
+) -> MartGennieFeedbackItem:
+    is_seeded = bool(getattr(record, "is_seeded", False))
+    return MartGennieFeedbackItem(
+        id=record.id,
+        user_id=None if is_seeded else record.user_id,
+        user_display_masked=record.user_display_masked,
+        feedback_text=record.feedback_text,
+        rating=int(record.rating or 5),
+        image_urls=list(record.image_urls or []),
+        likes_count=int(record.likes_count or 0),
+        can_delete=bool(current_user_id and record.user_id == current_user_id and not is_seeded),
+        current_user_liked=record.id in liked_feedback_ids,
+        created_at=record.created_at,
+    )
+
+
 async def list_feedback(
     session: AsyncSession,
     *,
-    limit: int = 9,
+    page: int = 1,
+    page_size: int = 5,
+    current_user: User | None = None,
 ) -> MartGennieFeedbackListOut:
     total_stmt = select(func.count()).select_from(MartGennieFeedbackRecord)
     total = int((await session.execute(total_stmt)).scalar_one() or 0)
@@ -363,37 +393,53 @@ async def list_feedback(
                     feedback_text=entry["feedback_text"],
                     context_tags=entry["context_tags"],
                     outcome_label=entry["outcome_label"],
+                    rating=5,
+                    image_urls=[],
                     used_negotiation=entry["used_negotiation"],
                     saved_amount=entry["saved_amount"],
+                    likes_count=0,
                     is_public=True,
+                    is_seeded=True,
                 )
                 for entry in DEFAULT_FEEDBACK_SEED
             ]
         )
         await session.commit()
 
+    liked_feedback_ids: set[uuid.UUID] = set()
+    current_user_id = current_user.id if current_user is not None else None
+    if current_user_id is not None:
+        liked_stmt = select(MartGennieFeedbackLikeRecord.feedback_id).where(
+            MartGennieFeedbackLikeRecord.user_id == current_user_id
+        )
+        liked_feedback_ids = set((await session.execute(liked_stmt)).scalars().all())
+
+    total_visible_stmt = select(func.count()).select_from(MartGennieFeedbackRecord).where(
+        MartGennieFeedbackRecord.is_public.is_(True)
+    )
+    total_count = int((await session.execute(total_visible_stmt)).scalar_one() or 0)
+    offset = max(page - 1, 0) * page_size
     stmt: Select[tuple[MartGennieFeedbackRecord]] = (
         select(MartGennieFeedbackRecord)
         .where(MartGennieFeedbackRecord.is_public.is_(True))
         .order_by(MartGennieFeedbackRecord.created_at.desc())
-        .limit(limit)
+        .offset(offset)
+        .limit(page_size)
     )
     records = (await session.execute(stmt)).scalars().all()
     return MartGennieFeedbackListOut(
+        page=page,
+        page_size=page_size,
+        total_count=total_count,
+        total_pages=max((total_count + page_size - 1) // page_size, 1),
         items=[
-            MartGennieFeedbackItem(
-                id=record.id,
-                user_id=record.user_id,
-                user_display_masked=record.user_display_masked,
-                feedback_text=record.feedback_text,
-                context_tags=list(record.context_tags or []),
-                outcome_label=record.outcome_label,
-                used_negotiation=record.used_negotiation,
-                saved_amount=_money(record.saved_amount),
-                created_at=record.created_at,
+            _feedback_item_from_record(
+                record,
+                current_user_id=current_user_id,
+                liked_feedback_ids=liked_feedback_ids,
             )
             for record in records
-        ]
+        ],
     )
 
 
@@ -407,11 +453,15 @@ async def create_feedback(
         user_id=user.id,
         user_display_masked=_mask_user_display(user),
         feedback_text=payload.feedback_text.strip(),
-        context_tags=_sanitize_feedback_tags(payload.context_tags),
-        outcome_label=payload.outcome_label.strip() if payload.outcome_label else None,
-        used_negotiation=payload.used_negotiation,
-        saved_amount=_money(payload.saved_amount),
+        context_tags=[],
+        outcome_label=None,
+        rating=payload.rating,
+        image_urls=payload.image_urls[:4],
+        used_negotiation=False,
+        saved_amount=0,
+        likes_count=0,
         is_public=True,
+        is_seeded=False,
     )
     session.add(record)
     await session.commit()
@@ -421,10 +471,11 @@ async def create_feedback(
         user_id=record.user_id,
         user_display_masked=record.user_display_masked,
         feedback_text=record.feedback_text,
-        context_tags=list(record.context_tags or []),
-        outcome_label=record.outcome_label,
-        used_negotiation=record.used_negotiation,
-        saved_amount=_money(record.saved_amount),
+        rating=record.rating,
+        image_urls=list(record.image_urls or []),
+        likes_count=int(record.likes_count or 0),
+        can_delete=True,
+        current_user_liked=False,
         created_at=record.created_at,
     )
 
@@ -440,8 +491,43 @@ async def delete_feedback(
         raise ValueError("Feedback record not found.")
     if record.user_id != user.id:
         raise PermissionError("You can only delete your own feedback.")
+    if bool(getattr(record, "is_seeded", False)):
+        raise PermissionError("Seeded feedback cannot be deleted.")
     await session.delete(record)
     await session.commit()
+
+
+async def toggle_feedback_like(
+    session: AsyncSession,
+    *,
+    feedback_id: uuid.UUID,
+    user: User,
+) -> MartGennieFeedbackLikeOut:
+    record = await session.get(MartGennieFeedbackRecord, feedback_id)
+    if record is None or not record.is_public:
+        raise ValueError("Feedback record not found.")
+
+    existing_stmt = select(MartGennieFeedbackLikeRecord).where(
+        MartGennieFeedbackLikeRecord.feedback_id == feedback_id,
+        MartGennieFeedbackLikeRecord.user_id == user.id,
+    )
+    existing = (await session.execute(existing_stmt)).scalars().first()
+    if existing is None:
+        session.add(
+            MartGennieFeedbackLikeRecord(
+                feedback_id=feedback_id,
+                user_id=user.id,
+            )
+        )
+        record.likes_count = int(record.likes_count or 0) + 1
+        liked = True
+    else:
+        await session.delete(existing)
+        record.likes_count = max(int(record.likes_count or 0) - 1, 0)
+        liked = False
+
+    await session.commit()
+    return MartGennieFeedbackLikeOut(likes_count=int(record.likes_count or 0), current_user_liked=liked)
 
 
 def _summary_query() -> Select[tuple[AgentShowcaseRecord]]:

@@ -10,6 +10,7 @@ from src.plaza import (
     AgentShowcaseSummary,
     MartGennieFeedbackCreateIn,
     MartGennieFeedbackItem,
+    MartGennieFeedbackLikeOut,
     MartGennieFeedbackListOut,
     PlazaRecommendationsOut,
 )
@@ -22,9 +23,10 @@ from src.plaza.service import (
     get_showcase_detail,
     list_feedback,
     list_showcases,
+    toggle_feedback_like,
 )
 from src.web.auth.db import get_async_session
-from src.web.auth.dependencies import CurrentActiveUser
+from src.web.auth.dependencies import CurrentActiveUser, OptionalCurrentActiveUser
 from src.web.auth.models import User
 
 
@@ -86,10 +88,12 @@ async def fetch_memory_recommendations(
 
 @router.get("/feedback", response_model=MartGennieFeedbackListOut)
 async def fetch_feedback(
-    limit: int = Query(default=9, ge=1, le=24),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=5, ge=1, le=20),
+    user: User | None = Depends(OptionalCurrentActiveUser),
     session: AsyncSession = Depends(get_async_session),
 ) -> MartGennieFeedbackListOut:
-    return await list_feedback(session, limit=limit)
+    return await list_feedback(session, page=page, page_size=page_size, current_user=user)
 
 
 @router.post("/feedback", response_model=MartGennieFeedbackItem, status_code=201)
@@ -113,3 +117,15 @@ async def delete_feedback_record(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+@router.post("/feedback/{feedback_id}/like", response_model=MartGennieFeedbackLikeOut)
+async def toggle_feedback_like_record(
+    feedback_id: uuid.UUID,
+    user: User = Depends(CurrentActiveUser),
+    session: AsyncSession = Depends(get_async_session),
+) -> MartGennieFeedbackLikeOut:
+    try:
+        return await toggle_feedback_like(session, feedback_id=feedback_id, user=user)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc

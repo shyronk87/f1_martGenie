@@ -71,19 +71,31 @@ export type MartGennieFeedbackItem = {
   user_id: string | null;
   user_display_masked: string;
   feedback_text: string;
-  context_tags: string[];
-  outcome_label: string | null;
-  used_negotiation: boolean;
-  saved_amount: number;
+  rating: number;
+  image_urls: string[];
+  likes_count: number;
+  can_delete: boolean;
+  current_user_liked: boolean;
   created_at: string;
 };
 
 export type MartGennieFeedbackList = {
+  page: number;
+  page_size: number;
+  total_count: number;
+  total_pages: number;
   items: MartGennieFeedbackItem[];
 };
 
 export type MartGennieFeedbackCreateInput = {
   feedback_text: string;
+  rating: number;
+  image_urls: string[];
+};
+
+export type MartGennieFeedbackLikeOut = {
+  likes_count: number;
+  current_user_liked: boolean;
 };
 
 type SeedResponse = {
@@ -129,8 +141,8 @@ export async function fetchPlazaRecommendations(): Promise<PlazaRecommendations>
   return parseJsonResponse<PlazaRecommendations>(response, "Could not load personalized recommendations.");
 }
 
-export async function fetchMartGennieFeedback(limit = 9): Promise<MartGennieFeedbackList> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback?limit=${limit}`, {
+export async function fetchMartGennieFeedback(page = 1, pageSize = 5): Promise<MartGennieFeedbackList> {
+  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback?page=${page}&page_size=${pageSize}`, {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<MartGennieFeedbackList>(response, "Could not load MartGennie feedback.");
@@ -165,6 +177,16 @@ export async function deleteMartGennieFeedback(feedbackId: string): Promise<void
     }
     throw new Error("Could not delete your feedback.");
   }
+}
+
+export async function toggleMartGennieFeedbackLike(
+  feedbackId: string,
+): Promise<MartGennieFeedbackLikeOut> {
+  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback/${feedbackId}/like`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+  });
+  return parseJsonResponse<MartGennieFeedbackLikeOut>(response, "Could not update feedback like.");
 }
 
 async function parseJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {

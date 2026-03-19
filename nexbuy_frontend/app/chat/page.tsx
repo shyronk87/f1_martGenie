@@ -1101,12 +1101,6 @@ export default function ChatWorkspacePage() {
     router.push("/order");
   }
 
-  function handleEmbeddedNegotiation(plan: PlanOption, item: PlanOption["items"][number]) {
-    router.push(
-      `/negotiation?sku=${encodeURIComponent(item.sku)}&title=${encodeURIComponent(item.title)}&price=${encodeURIComponent(String(item.price))}&imageUrl=${encodeURIComponent(item.imageUrl ?? "")}&planId=${encodeURIComponent(plan.id)}&planTitle=${encodeURIComponent(plan.title)}&sessionId=${encodeURIComponent(sessionId ?? "")}`,
-    );
-  }
-
   function renderResultsPanel(snapshotId: string) {
     const snapshotPlans = packageSnapshots[snapshotId];
     if (!snapshotPlans || snapshotPlans.length === 0) {
@@ -1210,20 +1204,19 @@ export default function ChatWorkspacePage() {
                                 <p className="text-xl font-black tracking-[-0.03em] text-[#0f172a]">
                                   ${item.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                 </p>
-                                <button
-                                  className="inline-flex shrink-0 items-center rounded-full border border-[#dce5ef] bg-[#f8fbff] px-3 py-1.5 text-xs font-semibold text-[#486480] transition hover:border-[#bfd4ec] hover:bg-[#eef4fb] hover:text-[#123b5f]"
-                                  onClick={() => handleEmbeddedNegotiation(plan, item)}
-                                  type="button"
-                                >
-                                  Negotiate
-                                </button>
                               </div>
                             </div>
                           </article>
                         ))}
                       </div>
 
-                      <div className="mt-5 flex justify-end border-t border-[#e8edf3] pt-4">
+                      <div className="mt-5 flex justify-end gap-3 border-t border-[#e8edf3] pt-4">
+                        <button
+                          className="inline-flex h-11 items-center justify-center rounded-[16px] border border-[#d6e0eb] bg-white px-5 text-sm font-semibold text-[#123b5f] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
+                          type="button"
+                        >
+                          View negotiate
+                        </button>
                         <button
                           className="inline-flex h-11 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
                           onClick={() => handleEmbeddedOrder(plan)}

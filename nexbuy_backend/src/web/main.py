@@ -24,6 +24,7 @@ from .projects.models import ensure_chat_project_schema
 from .projects.router import router as projects_router
 from .profile import models as _profile_models  # noqa: F401
 from .profile.router import router as profile_router
+from .products.router import router as products_router
 from .share_router import router as share_router
 
 
@@ -54,6 +55,7 @@ app.include_router(agent_negotiation_router, prefix="/api")
 app.include_router(plaza_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
 app.include_router(profile_router, prefix="/api")
+app.include_router(products_router, prefix="/api")
 app.include_router(share_router, prefix="/api")
 
 

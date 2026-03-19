@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { fetchCurrentUser, logoutSession, readAccessToken } from "@/lib/auth";
@@ -514,24 +515,26 @@ export default function PlazaPage() {
               </button>
             </div>
           </div>
-          <div className="relative h-56 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
-            {product.main_image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" src={product.main_image_url} />
-            ) : null}
-          </div>
-          <div className="flex flex-1 flex-col p-5">
-            <h3 className="line-clamp-2 min-h-[3.5rem] text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">
-              {product.title}
-            </h3>
-            <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
-              {product.recommendation_reason}
-            </p>
-            <p className="mt-auto pt-5 text-xl font-black tracking-[-0.03em] text-[#0f172a]">
-              {formatMoney(product.sale_price ?? 0)}
-            </p>
-          </div>
+          <Link className="block" href={`/product/${encodeURIComponent(product.sku_id_default)}`}>
+            <div className="relative h-56 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
+              {product.main_image_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img alt={product.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" src={product.main_image_url} />
+              ) : null}
+            </div>
+            <div className="flex flex-1 flex-col p-5">
+              <h3 className="line-clamp-2 min-h-[3.5rem] text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">
+                {product.title}
+              </h3>
+              <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
+                {product.recommendation_reason}
+              </p>
+              <p className="mt-auto pt-5 text-xl font-black tracking-[-0.03em] text-[#0f172a]">
+                {formatMoney(product.sale_price ?? 0)}
+              </p>
+            </div>
+          </Link>
           <div className={`pointer-events-none absolute top-0 z-40 hidden w-[320px] -translate-y-[84px] rounded-[24px] border border-[#dbe5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-[0_20px_48px_rgba(15,23,42,0.14)] xl:group-hover:block ${hoverPanelPositionClass}`}>
             <div className="flex items-start gap-3">
               {product.main_image_url ? (

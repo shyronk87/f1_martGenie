@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -1519,42 +1520,44 @@ export default function ChatWorkspacePage() {
                                 <span aria-hidden="true">{favoriteSkuSet.has(item.sku) ? "♥" : "♡"}</span>
                               </button>
                             </div>
-                            <div className="relative h-44 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
-                              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
-                              {item.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  alt={item.title}
-                                  className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                                  src={item.imageUrl}
-                                />
-                              ) : (
-                                <div className="h-full w-full bg-[linear-gradient(135deg,#dbeafe,#f8fafc)]" />
-                              )}
-                            </div>
-                            <div className="flex flex-1 flex-col p-5">
-                              <h5 className="line-clamp-2 min-h-[3.5rem] text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">
-                                {item.title}
-                              </h5>
-                              <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
-                                {item.reason}
-                              </p>
-                              <div className="mt-auto flex items-center justify-between gap-3 pt-5">
-                                <div>
-                                  <p className="text-sm font-medium text-[#98a2b3] line-through">
-                                    ${itemSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                  </p>
-                                  <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#123b5f]">
-                                    ${itemSavingsMeta.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                  </p>
-                                  {itemSavingsMeta.savedAmount > 0 ? (
-                                    <p className="mt-1 text-xs font-semibold text-[#2563eb]">
-                                      Save ${itemSavingsMeta.savedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            <Link className="block" href={`/product/${encodeURIComponent(item.sku)}`}>
+                              <div className="relative h-44 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
+                                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
+                                {item.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    alt={item.title}
+                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                                    src={item.imageUrl}
+                                  />
+                                ) : (
+                                  <div className="h-full w-full bg-[linear-gradient(135deg,#dbeafe,#f8fafc)]" />
+                                )}
+                              </div>
+                              <div className="flex flex-1 flex-col p-5">
+                                <h5 className="line-clamp-2 min-h-[3.5rem] text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">
+                                  {item.title}
+                                </h5>
+                                <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
+                                  {item.reason}
+                                </p>
+                                <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+                                  <div>
+                                    <p className="text-sm font-medium text-[#98a2b3] line-through">
+                                      ${itemSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                     </p>
-                                  ) : null}
+                                    <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#123b5f]">
+                                      ${itemSavingsMeta.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    </p>
+                                    {itemSavingsMeta.savedAmount > 0 ? (
+                                      <p className="mt-1 text-xs font-semibold text-[#2563eb]">
+                                        Save ${itemSavingsMeta.savedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                      </p>
+                                    ) : null}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            </Link>
                           </article>
                             );
                           })()

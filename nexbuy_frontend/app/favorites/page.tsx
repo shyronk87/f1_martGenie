@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearAccessToken, fetchCurrentUser, logoutSession, readAccessToken } from "@/lib/auth";
@@ -272,65 +273,67 @@ export default function FavoritesPage() {
                         className="overflow-hidden rounded-[28px] border border-[#dde5ef] bg-white shadow-[0_16px_36px_rgba(148,163,184,0.12)]"
                         key={item.sku_id_default}
                       >
-                        {item.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img alt={item.title} className="h-56 w-full object-cover" src={item.image_url} />
-                        ) : (
-                          <div className="h-56 bg-[linear-gradient(135deg,#dbeafe,#f8fafc)]" />
-                        )}
-                        <div className="space-y-4 p-5">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
-                              {item.category_label || item.source_page || "Saved item"}
-                            </p>
-                            <h2 className="mt-2 text-xl font-semibold leading-8 tracking-[-0.03em] text-[#101828]">
-                              {item.title}
-                            </h2>
-                            {item.description_text ? (
-                              <p className="mt-3 text-sm leading-7 text-[#667085]">{item.description_text}</p>
+                        <Link className="block" href={`/product/${encodeURIComponent(item.sku_id_default)}`}>
+                          {item.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img alt={item.title} className="h-56 w-full object-cover" src={item.image_url} />
+                          ) : (
+                            <div className="h-56 bg-[linear-gradient(135deg,#dbeafe,#f8fafc)]" />
+                          )}
+                          <div className="space-y-4 p-5">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
+                                {item.category_label || item.source_page || "Saved item"}
+                              </p>
+                              <h2 className="mt-2 text-xl font-semibold leading-8 tracking-[-0.03em] text-[#101828]">
+                                {item.title}
+                              </h2>
+                              {item.description_text ? (
+                                <p className="mt-3 text-sm leading-7 text-[#667085]">{item.description_text}</p>
+                              ) : null}
+                            </div>
+                            {item.recommendation_reason ? (
+                              <div className="rounded-[20px] border border-[#e8edf4] bg-[#f8fbff] px-4 py-3 text-sm leading-6 text-[#475467]">
+                                {item.recommendation_reason}
+                              </div>
+                            ) : null}
+                            {getSpecEntries(item.specs).length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {getSpecEntries(item.specs).map(([label, value]) => (
+                                  <span
+                                    className="rounded-full border border-[#d9e4f2] bg-white px-3 py-1.5 text-sm text-[#344054]"
+                                    key={`${item.sku_id_default}-${label}`}
+                                  >
+                                    {label}: {value}
+                                  </span>
+                                ))}
+                              </div>
                             ) : null}
                           </div>
-                          {item.recommendation_reason ? (
-                            <div className="rounded-[20px] border border-[#e8edf4] bg-[#f8fbff] px-4 py-3 text-sm leading-6 text-[#475467]">
-                              {item.recommendation_reason}
-                            </div>
-                          ) : null}
-                          {getSpecEntries(item.specs).length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {getSpecEntries(item.specs).map(([label, value]) => (
-                                <span
-                                  className="rounded-full border border-[#d9e4f2] bg-white px-3 py-1.5 text-sm text-[#344054]"
-                                  key={`${item.sku_id_default}-${label}`}
-                                >
-                                  {label}: {value}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                          <div className="flex items-center justify-between gap-3 border-t border-[#e8edf4] pt-4">
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.16em] text-[#8b97a8]">Price</p>
-                              <p className="mt-1 text-2xl font-black text-[#101828]">
-                                {typeof item.sale_price === "number" ? `$${item.sale_price.toLocaleString()}` : "--"}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <button
-                                className="inline-flex h-11 items-center justify-center rounded-full border border-[#d5dde8] bg-white px-4 text-sm font-semibold text-[#344054] transition hover:bg-[#f8fafc]"
-                                disabled={removingProductSku === item.sku_id_default}
-                                onClick={() => void handleRemoveProduct(item.sku_id_default)}
-                                type="button"
-                              >
-                                Remove
-                              </button>
-                              <button
-                                className="inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white"
-                                onClick={() => handlePlaceProductOrder(item)}
-                                type="button"
-                              >
-                                Place order
-                              </button>
-                            </div>
+                        </Link>
+                        <div className="flex items-center justify-between gap-3 border-t border-[#e8edf4] px-5 py-4">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.16em] text-[#8b97a8]">Price</p>
+                            <p className="mt-1 text-2xl font-black text-[#101828]">
+                              {typeof item.sale_price === "number" ? `$${item.sale_price.toLocaleString()}` : "--"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              className="inline-flex h-11 items-center justify-center rounded-full border border-[#d5dde8] bg-white px-4 text-sm font-semibold text-[#344054] transition hover:bg-[#f8fafc]"
+                              disabled={removingProductSku === item.sku_id_default}
+                              onClick={() => void handleRemoveProduct(item.sku_id_default)}
+                              type="button"
+                            >
+                              Remove
+                            </button>
+                            <button
+                              className="inline-flex h-11 items-center justify-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white"
+                              onClick={() => handlePlaceProductOrder(item)}
+                              type="button"
+                            >
+                              Place order
+                            </button>
                           </div>
                         </div>
                       </article>

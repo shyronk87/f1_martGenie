@@ -735,10 +735,7 @@ export default function NegotiationPage() {
     if (!resolvedSku || acceptedPrice == null) {
       return;
     }
-    const nextHref = resolvedPlanId
-      ? `/recommendations?plan=${encodeURIComponent(resolvedPlanId)}`
-      : "/recommendations";
-    router.push(nextHref);
+    router.push("/chat");
   }
 
   return (

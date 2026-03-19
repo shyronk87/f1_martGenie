@@ -61,7 +61,7 @@ function getOrderBasePath(source: OrderCheckoutContext["source"]) {
   if (source === "favorites") {
     return "/favorites";
   }
-  return "/recommendations";
+  return "/chat";
 }
 
 function getBackLabel(source: OrderCheckoutContext["source"]) {
@@ -74,7 +74,7 @@ function getBackLabel(source: OrderCheckoutContext["source"]) {
   if (source === "favorites") {
     return "Back to My Likes";
   }
-  return "Back to Packages";
+  return "Back to Chat";
 }
 
 function ProgressDot(props: { done: boolean; active: boolean; icon: string }) {
@@ -144,7 +144,7 @@ export default function OrderPage() {
   const shippingFee = 0;
   const savings = checkout?.negotiatedSavings ?? 0;
   const totalAmount = subtotal + shippingFee;
-  const backHref = checkout ? getOrderBasePath(checkout.source) : "/recommendations";
+  const backHref = checkout ? getOrderBasePath(checkout.source) : "/chat";
   const backLabel = checkout ? getBackLabel(checkout.source) : "Back";
   const itemCount = useMemo(
     () => checkout?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
@@ -199,9 +199,9 @@ export default function OrderPage() {
               <div className="mt-8 flex justify-center gap-3">
                 <Link
                   className="inline-flex h-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-6 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,0.16)] transition hover:brightness-105"
-                  href="/recommendations"
+                  href="/chat"
                 >
-                  Back to packages
+                  Back to chat
                 </Link>
               </div>
             </div>

@@ -208,7 +208,7 @@ export default function FavoritesPage() {
                 >
                   <span>
                     <span className="block text-sm font-semibold text-[#1d4ed8]">Product bundles</span>
-                    <span className="mt-1 block text-sm text-[#4b5563]">Complete package sets you saved from recommendations.</span>
+                    <span className="mt-1 block text-sm text-[#4b5563]">Complete product sets you saved from chat results.</span>
                   </span>
                   <span className="rounded-full bg-white/80 px-2 py-1 text-xs font-semibold text-[#1d4ed8]">
                     {counts.bundles}
@@ -225,7 +225,7 @@ export default function FavoritesPage() {
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-7 text-[#526173]">
                   {activeSection === "products"
-                    ? "Save products from Plaza or Packages, then compare them, order them, or remove them later."
+                    ? "Save products from Plaza or chat results, then compare them, order them, or remove them later."
                     : "Save full recommendation sets, reopen them when you want the whole look, and order them in one go."}
                 </p>
               </div>
@@ -262,7 +262,7 @@ export default function FavoritesPage() {
                   <div className="mt-6 rounded-[28px] border border-dashed border-[#d4dce7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-16 text-center">
                     <p className="text-2xl font-semibold tracking-[-0.03em] text-[#101828]">No liked products yet</p>
                     <p className="mt-3 text-sm leading-7 text-[#667085]">
-                      Tap the heart on products in Plaza or Packages and they will show up here.
+                      Tap the heart on products in Plaza or chat results and they will show up here.
                     </p>
                   </div>
                 ) : (
@@ -341,7 +341,7 @@ export default function FavoritesPage() {
                 <div className="mt-6 rounded-[28px] border border-dashed border-[#d4dce7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-16 text-center">
                   <p className="text-2xl font-semibold tracking-[-0.03em] text-[#101828]">No liked bundles yet</p>
                   <p className="mt-3 text-sm leading-7 text-[#667085]">
-                    Tap the heart on package options in Packages and they will show up here.
+                    Tap the heart on bundle options in chat results and they will show up here.
                   </p>
                 </div>
               ) : (

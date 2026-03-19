@@ -63,6 +63,27 @@ type DraftAttachment = {
   sizeLabel: string;
 };
 
+type MockNegotiationPlan = {
+  id: string;
+  title: string;
+  items: Array<{
+    sku: string;
+    title: string;
+    originalPrice: number;
+    currentPrice: number;
+    finalPrice: number;
+  }>;
+  rounds: Array<{
+    label: string;
+    buyerOffer: number;
+    sellerCounter: number;
+    note: string;
+  }>;
+  totalOriginalPrice: number;
+  totalCurrentPrice: number;
+  totalFinalPrice: number;
+};
+
 const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
 const CHAT_HISTORY_REFRESH_EVENT = "nexbuy.chat.history.updated";
 const LEGACY_AI_STATUS = "AI is analyzing your request...";
@@ -268,6 +289,15 @@ function notifyHistoryRefresh() {
   window.dispatchEvent(new Event(CHAT_HISTORY_REFRESH_EVENT));
 }
 
+function deriveListPrice(item: PlanOption["items"][number]) {
+  if (typeof item.originalPrice === "number" && item.originalPrice > item.price) {
+    return item.originalPrice;
+  }
+
+  const stableMarkup = 1.12 + ((item.sku.charCodeAt(item.sku.length - 1) || 0) % 6) * 0.02;
+  return Math.round(item.price * stableMarkup * 100) / 100;
+}
+
 
 export default function ChatWorkspacePage() {
   const router = useRouter();
@@ -312,6 +342,7 @@ export default function ChatWorkspacePage() {
       }
     | null
   >(null);
+  const [mockNegotiationPlan, setMockNegotiationPlan] = useState<MockNegotiationPlan | null>(null);
   const [status, setStatus] = useState("Preparing workspace...");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -1269,6 +1300,58 @@ export default function ChatWorkspacePage() {
     }
   }
 
+  function handleOpenMockNegotiation(plan: PlanOption) {
+    const pricedItems = plan.items.map((item, index) => {
+      const originalPrice = deriveListPrice(item);
+      const currentPrice = item.price;
+      const reductionRatio = 0.9 - index * 0.015;
+      const finalPrice = Math.max(currentPrice * reductionRatio, currentPrice * 0.82);
+      return {
+        sku: item.sku,
+        title: item.title,
+        originalPrice: Math.round(originalPrice * 100) / 100,
+        currentPrice: Math.round(currentPrice * 100) / 100,
+        finalPrice: Math.round(finalPrice * 100) / 100,
+      };
+    });
+
+    const totalOriginalPrice = pricedItems.reduce((sum, item) => sum + item.originalPrice, 0);
+    const totalCurrentPrice = pricedItems.reduce((sum, item) => sum + item.currentPrice, 0);
+    const totalFinalPrice = pricedItems.reduce((sum, item) => sum + item.finalPrice, 0);
+    const roundOneOffer = Math.round(totalCurrentPrice * 0.88 * 100) / 100;
+    const roundTwoCounter = Math.round(totalCurrentPrice * 0.95 * 100) / 100;
+    const roundTwoOffer = Math.round(totalCurrentPrice * 0.91 * 100) / 100;
+
+    setMockNegotiationPlan({
+      id: plan.id,
+      title: plan.title,
+      items: pricedItems,
+      rounds: [
+        {
+          label: "Round 1",
+          buyerOffer: roundOneOffer,
+          sellerCounter: roundTwoCounter,
+          note: "The buyer agent opened below the current package price to test available concession room.",
+        },
+        {
+          label: "Round 2",
+          buyerOffer: roundTwoOffer,
+          sellerCounter: totalFinalPrice,
+          note: "The seller narrowed the gap after checking room to move on the set.",
+        },
+        {
+          label: "Round 3",
+          buyerOffer: totalFinalPrice,
+          sellerCounter: totalFinalPrice,
+          note: "A final counter aligned with the seller's acceptable floor and was accepted.",
+        },
+      ],
+      totalOriginalPrice: Math.round(totalOriginalPrice * 100) / 100,
+      totalCurrentPrice: Math.round(totalCurrentPrice * 100) / 100,
+      totalFinalPrice: Math.round(totalFinalPrice * 100) / 100,
+    });
+  }
+
   function renderResultsPanel(snapshotId: string) {
     const snapshotPlans = packageSnapshots[snapshotId];
     if (!snapshotPlans || snapshotPlans.length === 0) {
@@ -1417,9 +1500,14 @@ export default function ChatWorkspacePage() {
                                 {item.reason}
                               </p>
                               <div className="mt-auto flex items-center justify-between gap-3 pt-5">
-                                <p className="text-xl font-black tracking-[-0.03em] text-[#0f172a]">
-                                  ${item.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                </p>
+                                <div>
+                                  <p className="text-sm font-medium text-[#98a2b3] line-through">
+                                    ${deriveListPrice(item).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                  </p>
+                                  <p className="text-xl font-black tracking-[-0.03em] text-[#0f172a]">
+                                    ${item.price.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                  </p>
+                                </div>
                               </div>
                             </div>
                           </article>
@@ -1429,6 +1517,7 @@ export default function ChatWorkspacePage() {
                       <div className="mt-5 flex justify-end gap-3 border-t border-[#e8edf3] pt-4">
                         <button
                           className="inline-flex h-11 items-center justify-center rounded-[16px] border border-[#d6e0eb] bg-white px-5 text-sm font-semibold text-[#123b5f] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
+                          onClick={() => handleOpenMockNegotiation(plan)}
                           type="button"
                         >
                           View negotiate
@@ -1999,6 +2088,101 @@ export default function ChatWorkspacePage() {
         shareLabel={shareTarget?.type === "bundle" ? "bundle" : "product"}
         title={shareTarget?.title ?? ""}
       />
+      {mockNegotiationPlan ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#0f172a]/35 p-4">
+          <div className="w-full max-w-[880px] rounded-[28px] border border-[#d7e2ee] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.22)]">
+            <div className="flex items-start justify-between gap-6 border-b border-[#e7edf4] px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">Mock negotiation</p>
+                <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#101828]">{mockNegotiationPlan.title}</h3>
+                <p className="mt-2 text-sm leading-7 text-[#667085]">
+                  A mocked three-round negotiation preview based on the product pricing already in the catalog.
+                </p>
+              </div>
+              <button
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f8fafc] hover:text-[#344054]"
+                onClick={() => setMockNegotiationPlan(null)}
+                type="button"
+              >
+                <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <path d="m7 7 10 10M17 7 7 17" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid gap-6 px-6 py-6 lg:grid-cols-[1.05fr_0.95fr]">
+              <div className="space-y-4">
+                {mockNegotiationPlan.rounds.map((round, index) => (
+                  <div className="rounded-[22px] border border-[#e3eaf3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4" key={round.label}>
+                    <div className="flex items-center justify-between gap-4">
+                      <p className="text-sm font-semibold text-[#123b5f]">{round.label}</p>
+                      <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-semibold text-[#486480]">
+                        {index === 2 ? "Accepted" : "Countered"}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-[18px] border border-[#e6edf5] bg-white px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">Buyer offer</p>
+                        <p className="mt-2 text-xl font-black text-[#101828]">${round.buyerOffer.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                      </div>
+                      <div className="rounded-[18px] border border-[#e6edf5] bg-white px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#98a2b3]">Seller counter</p>
+                        <p className="mt-2 text-xl font-black text-[#101828]">${round.sellerCounter.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-[#667085]">{round.note}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-[22px] border border-[#dbe5ef] bg-[linear-gradient(180deg,#fbfdff_0%,#f6f9fc_100%)] p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b97a8]">Package pricing</p>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-[#667085]">Original total</span>
+                      <span className="text-base font-semibold text-[#98a2b3] line-through">
+                        ${mockNegotiationPlan.totalOriginalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-[#667085]">Current package price</span>
+                      <span className="text-lg font-black text-[#101828]">
+                        ${mockNegotiationPlan.totalCurrentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm text-[#667085]">Mock negotiated price</span>
+                      <span className="text-2xl font-black text-emerald-600">
+                        ${mockNegotiationPlan.totalFinalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-[#dbe5ef] bg-white p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b97a8]">Items in this set</p>
+                  <div className="mt-4 space-y-3">
+                    {mockNegotiationPlan.items.map((item) => (
+                      <div className="flex items-start justify-between gap-4 rounded-[18px] border border-[#edf2f7] bg-[#fbfdff] px-4 py-3" key={item.sku}>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-[#101828]">{item.title}</p>
+                          <p className="mt-1 text-xs text-[#98a2b3] line-through">
+                            ${item.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-black text-[#101828]">
+                          ${item.finalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <AuthModal
         onAuthSuccess={() => {
           setIsAuthenticated(true);

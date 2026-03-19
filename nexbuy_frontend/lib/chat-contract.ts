@@ -29,6 +29,7 @@ export type PlanItem = {
   sku: string;
   title: string;
   price: number;
+  originalPrice?: number | null;
   reason: string;
   imageUrl?: string | null;
   productUrl?: string | null;

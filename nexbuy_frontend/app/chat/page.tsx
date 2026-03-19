@@ -365,8 +365,8 @@ export default function ChatWorkspacePage() {
           setPlans([]);
           setPackageSnapshots({});
           setActivePlanId(null);
-          setError("Sign in to start the conversation.");
-          setStatus("Sign in to start your shopping workspace.");
+          setError("");
+          setStatus("Tell me your room, style, budget, and must-have pieces.");
           return;
         }
         setError(sessionError instanceof Error ? sessionError.message : "Could not restore chat session.");
@@ -444,8 +444,8 @@ export default function ChatWorkspacePage() {
     async function bootstrap() {
       const token = readAccessToken();
       if (!token) {
-        setStatus("Sign in to start your shopping workspace.");
-        setError("Sign in to start the conversation.");
+        setStatus("Tell me your room, style, budget, and must-have pieces.");
+        setError("");
         return;
       }
 
@@ -491,8 +491,8 @@ export default function ChatWorkspacePage() {
         clearAccessToken();
         setIsAuthenticated(false);
         if (isUnauthorizedAuthError(bootstrapError)) {
-          setError("Sign in to start the conversation.");
-          setStatus("Sign in to start your shopping workspace.");
+          setError("");
+          setStatus("Tell me your room, style, budget, and must-have pieces.");
           return;
         }
         const message =
@@ -515,8 +515,28 @@ export default function ChatWorkspacePage() {
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = prompt.trim();
-    if (!content || !sessionId || isSending) {
+    if (!content || isSending) {
       return;
+    }
+
+    const token = readAccessToken();
+    if (!token) {
+      setAuthOpen(true);
+      return;
+    }
+
+    let activeSessionId = sessionId;
+    if (!activeSessionId) {
+      try {
+        activeSessionId = await createChatSession(readSelectedProjectId() || undefined);
+        setSessionId(activeSessionId);
+      } catch (sessionError) {
+        const message =
+          sessionError instanceof Error ? sessionError.message : "Could not create chat session.";
+        setError(message);
+        setStatus("Could not prepare a workspace.");
+        return;
+      }
     }
 
     setPrompt("");
@@ -537,7 +557,7 @@ export default function ChatWorkspacePage() {
     ]);
 
     try {
-      const { taskId } = await sendChatMessage(sessionId, content);
+      const { taskId } = await sendChatMessage(activeSessionId, content);
       notifyHistoryRefresh();
       setTimeline((current) => [
         {
@@ -550,7 +570,7 @@ export default function ChatWorkspacePage() {
       ]);
 
       unsubscribeRef.current?.();
-      unsubscribeRef.current = subscribeChatStream(sessionId, taskId, (eventPayload) => {
+      unsubscribeRef.current = subscribeChatStream(activeSessionId, taskId, (eventPayload) => {
         if (eventPayload.type === "timeline_event") {
           setTimeline((current) => [eventPayload.event, ...current]);
           return;
@@ -840,7 +860,7 @@ export default function ChatWorkspacePage() {
           <textarea
             className={textareaClass}
             data-variant={which}
-            disabled={!sessionId || isSending}
+            disabled={isSending}
             onChange={(event) => handlePromptChange(event.target.value, textareaRef.current)}
             placeholder={placeholder}
             ref={textareaRef}
@@ -905,7 +925,7 @@ export default function ChatWorkspacePage() {
                   ? "bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] hover:brightness-105"
                   : "bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] hover:brightness-105 disabled:cursor-not-allowed disabled:bg-[#b7c8d8] disabled:text-slate-200"
               }`}
-              disabled={!isSending && (!sessionId || (!prompt.trim() && draftAttachments.length === 0))}
+              disabled={!isSending && (!prompt.trim() && draftAttachments.length === 0)}
               onClick={isSending ? handleCancel : undefined}
               type={isSending ? "button" : "submit"}
             >

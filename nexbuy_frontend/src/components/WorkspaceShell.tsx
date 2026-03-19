@@ -429,10 +429,8 @@ export default function WorkspaceShell({
                 </div>
               ) : (
                 <div className="rounded-[18px] bg-[linear-gradient(180deg,#f7fbff_0%,#eef5fd_100%)] px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7b8798]">Account</p>
-                  <p className="mt-2 text-sm font-medium text-[#101828]">Sign in to keep your workspace and deals.</p>
                   <button
-                    className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
+                    className="inline-flex h-10 w-full items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
                     onClick={onOpenAuth}
                     type="button"
                   >

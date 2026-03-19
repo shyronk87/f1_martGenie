@@ -286,7 +286,7 @@ export default function ChatWorkspacePage() {
   const [editingMessageContent, setEditingMessageContent] = useState("");
   const [embeddedExpandedPlanIds, setEmbeddedExpandedPlanIds] = useState<Record<string, string[]>>({});
   const [isResultsPanelOpen, setIsResultsPanelOpen] = useState(false);
-  const [resultsPanelWidth, setResultsPanelWidth] = useState(440);
+  const [resultsPanelWidth, setResultsPanelWidth] = useState(760);
   const [status, setStatus] = useState("Preparing workspace...");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -467,6 +467,10 @@ export default function ChatWorkspacePage() {
   useEffect(() => {
     if (latestPackageSnapshotId) {
       setIsResultsPanelOpen(true);
+      if (typeof window !== "undefined") {
+        const preferredWidth = Math.round(window.innerWidth * 0.58);
+        setResultsPanelWidth(Math.min(1040, Math.max(560, preferredWidth)));
+      }
     }
   }, [latestPackageSnapshotId]);
 
@@ -476,7 +480,7 @@ export default function ChatWorkspacePage() {
         return;
       }
 
-      const nextWidth = Math.min(640, Math.max(340, window.innerWidth - event.clientX));
+      const nextWidth = Math.min(1040, Math.max(560, window.innerWidth - event.clientX));
       setResultsPanelWidth(nextWidth);
     }
 
@@ -1188,7 +1192,10 @@ export default function ChatWorkspacePage() {
 
                   {isExpanded ? (
                     <div className="border-t border-[#dce8f5] px-4 py-5">
-                      <div className="grid gap-4 lg:grid-cols-2">
+                      <div
+                        className="grid justify-center gap-4"
+                        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 280px))" }}
+                      >
                         {plan.items.map((item) => (
                           <article
                             className="group relative z-0 flex flex-1 flex-col overflow-hidden rounded-[24px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.12)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.14)]"

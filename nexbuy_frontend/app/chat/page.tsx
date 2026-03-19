@@ -1378,6 +1378,12 @@ export default function ChatWorkspacePage() {
           <div className="space-y-3">
             {snapshotPlans.map((plan) => {
               const isExpanded = expandedPlanIds.includes(plan.id);
+              const currentTotalPrice = Math.round(
+                plan.items.reduce((sum, item) => sum + item.price, 0) * 100,
+              ) / 100;
+              const originalTotalPrice = Math.round(
+                plan.items.reduce((sum, item) => sum + deriveListPrice(item), 0) * 100,
+              ) / 100;
               return (
                 <div
                   className={`overflow-hidden rounded-[22px] border transition ${
@@ -1394,41 +1400,50 @@ export default function ChatWorkspacePage() {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[#101828]">{plan.title}</p>
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 max-w-[320px]">
+                            <p className="text-sm font-semibold text-[#101828]">{plan.title}</p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              aria-label="Share bundle by email"
+                              className="inline-flex h-9 w-9 items-center justify-center text-[20px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleOpenBundleShare(plan);
+                              }}
+                              type="button"
+                            >
+                              ✉
+                            </button>
+                            <button
+                              aria-label={favoriteBundleIdSet.has(plan.id) ? "Remove bundle from likes" : "Add bundle to likes"}
+                              className={`inline-flex h-9 w-9 items-center justify-center text-[22px] leading-none transition ${
+                                favoriteBundleIdSet.has(plan.id) ? "text-[#dc2626]" : "text-[#111827]"
+                              }`}
+                              disabled={isUpdatingFavoriteBundleId === plan.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleToggleFavoriteBundle(plan);
+                              }}
+                              type="button"
+                            >
+                              <span aria-hidden="true">{favoriteBundleIdSet.has(plan.id) ? "♥" : "♡"}</span>
+                            </button>
+                          </div>
+                        </div>
                         <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#667085]">
                           {plan.explanation || plan.summary}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <button
-                            aria-label="Share bundle by email"
-                            className="inline-flex h-9 w-9 items-center justify-center text-[20px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleOpenBundleShare(plan);
-                            }}
-                            type="button"
-                          >
-                            ✉
-                          </button>
-                          <button
-                            aria-label={favoriteBundleIdSet.has(plan.id) ? "Remove bundle from likes" : "Add bundle to likes"}
-                            className={`inline-flex h-9 w-9 items-center justify-center text-[22px] leading-none transition ${
-                              favoriteBundleIdSet.has(plan.id) ? "text-[#dc2626]" : "text-[#111827]"
-                            }`}
-                            disabled={isUpdatingFavoriteBundleId === plan.id}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleToggleFavoriteBundle(plan);
-                            }}
-                            type="button"
-                          >
-                            <span aria-hidden="true">{favoriteBundleIdSet.has(plan.id) ? "♥" : "♡"}</span>
-                          </button>
-                        </div>
-                        <div className="rounded-full bg-white/80 px-3 py-1.5 text-sm font-semibold text-[#123b5f]">
-                          ${plan.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      <div className="flex shrink-0 items-center gap-3">
+                        <div className="flex flex-col items-end">
+                          <p className="text-xs font-medium text-[#98a2b3] line-through">
+                            ${originalTotalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </p>
+                          <div className="rounded-full bg-white/80 px-3 py-1.5 text-sm font-semibold text-[#123b5f]">
+                            ${currentTotalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          </div>
                         </div>
                         <span
                           className={`inline-flex items-center justify-center text-[#98a2b3] transition ${isExpanded ? "rotate-180" : ""}`}

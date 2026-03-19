@@ -1499,7 +1499,11 @@ export default function ChatWorkspacePage() {
                             className="group relative z-0 flex flex-1 flex-col overflow-hidden rounded-[24px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.12)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.14)]"
                             key={`${plan.id}-${item.sku}`}
                           >
-                            <div className="flex items-center justify-end gap-2 px-5 pt-4">
+                            <div className="flex items-center justify-between gap-3 px-5 pt-4">
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b97a8]">
+                                Click card for details
+                              </span>
+                              <div className="flex items-center gap-2">
                               <button
                                 aria-label="Share by email"
                                 className="inline-flex h-8 w-8 items-center justify-center text-[24px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
@@ -1519,6 +1523,7 @@ export default function ChatWorkspacePage() {
                               >
                                 <span aria-hidden="true">{favoriteSkuSet.has(item.sku) ? "♥" : "♡"}</span>
                               </button>
+                              </div>
                             </div>
                             <Link className="block" href={`/product/${encodeURIComponent(item.sku)}?from=chat`}>
                               <div className="relative h-44 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">

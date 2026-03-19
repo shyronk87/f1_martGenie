@@ -15,6 +15,11 @@ type OAuthAuthorizeResponse = {
   authorization_url: string;
 };
 
+type SessionTokenResponse = {
+  access_token: string;
+  token_type: string;
+};
+
 export class AuthRequestError extends Error {
   status: number;
 
@@ -109,6 +114,86 @@ export function clearAccessToken() {
   window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
 }
 
+let refreshPromise: Promise<string> | null = null;
+
+async function requestSessionRefresh() {
+  const response = await fetch(`${getApiBaseUrl()}/auth/session/refresh`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  const data = await parseJsonResponse<SessionTokenResponse>(
+    response,
+    "SESSION_EXPIRED",
+  );
+
+  if (!data.access_token) {
+    throw new AuthRequestError("SESSION_EXPIRED", 401);
+  }
+
+  saveAccessToken(data.access_token);
+  return data.access_token;
+}
+
+export async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = requestSessionRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}
+
+export async function logoutSession() {
+  try {
+    await fetch(`${getApiBaseUrl()}/auth/session/logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } finally {
+    clearAccessToken();
+  }
+}
+
+export async function authenticatedFetch(
+  input: RequestInfo | URL,
+  init: RequestInit & { skipAuthRetry?: boolean } = {},
+): Promise<Response> {
+  const headers = new Headers(init.headers ?? {});
+  const initialToken = readAccessToken();
+  if (initialToken && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${initialToken}`);
+  }
+
+  const response = await fetch(input, {
+    ...init,
+    headers,
+    credentials: init.credentials ?? "include",
+  });
+
+  if (
+    (response.status === 401 || response.status === 403) &&
+    !init.skipAuthRetry
+  ) {
+    try {
+      const refreshedToken = await refreshAccessToken();
+      const retryHeaders = new Headers(init.headers ?? {});
+      retryHeaders.set("Authorization", `Bearer ${refreshedToken}`);
+      return await fetch(input, {
+        ...init,
+        headers: retryHeaders,
+        credentials: init.credentials ?? "include",
+      });
+    } catch {
+      clearAccessToken();
+      throw new AuthRequestError("SESSION_EXPIRED", response.status);
+    }
+  }
+
+  return response;
+}
+
 export function saveOAuthReturnTo(path: string) {
   if (typeof window === "undefined") {
     return;
@@ -153,8 +238,9 @@ export async function loginWithEmail(email: string, password: string) {
   formData.set("username", email);
   formData.set("password", password);
 
-  const response = await fetch(`${getApiBaseUrl()}/auth/jwt/login`, {
+  const response = await fetch(`${getApiBaseUrl()}/auth/session/login`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
     },
@@ -173,11 +259,13 @@ export async function loginWithEmail(email: string, password: string) {
   return data.access_token;
 }
 
-export async function fetchCurrentUser(token: string) {
-  const response = await fetch(`${getApiBaseUrl()}/users/me`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+export async function fetchCurrentUser(token?: string) {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/users/me`, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
   });
 
   return parseJsonResponse<AuthUser>(response, "Could not load current user.");
@@ -283,6 +371,7 @@ function mapAuthErrorMessage(message: string, fallbackMessage: string) {
     OAUTH_NOT_AVAILABLE_EMAIL: "The provider did not return a usable email address.",
     OAUTH_INVALID_STATE: "The sign-in session expired. Please try again.",
     OAUTH_CALLBACK_ERROR: "Third-party sign-in could not be completed. Please try again.",
+    SESSION_EXPIRED: "Your session expired. Please sign in again.",
     VERIFY_USER_BAD_TOKEN: "This verification link is invalid or has expired.",
     RESET_PASSWORD_BAD_TOKEN: "This reset link is invalid or has expired.",
   };

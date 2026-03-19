@@ -20,6 +20,7 @@ from httpx_oauth.exceptions import GetIdEmailError
 from .auth_backend import auth_backend
 from .config import settings
 from .oauth import google_oauth_client
+from .session_tokens import generate_refresh_token, set_refresh_cookie
 from .users import get_user_manager
 
 
@@ -106,6 +107,7 @@ async def google_callback(
             url=_build_frontend_redirect(access_token=access_token, token_type="bearer"),
             status_code=status.HTTP_302_FOUND,
         )
+        set_refresh_cookie(redirect, generate_refresh_token(user))
         await user_manager.on_after_login(user, request, redirect)
         redirect.delete_cookie(CSRF_TOKEN_COOKIE_NAME, path="/")
         return redirect

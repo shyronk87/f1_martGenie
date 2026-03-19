@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
+import { clearAccessToken, fetchCurrentUser, logoutSession, readAccessToken } from "@/lib/auth";
 import AuthModal from "@/src/components/AuthModal";
 import WorkspaceShell from "@/src/components/WorkspaceShell";
 
@@ -172,9 +172,10 @@ export default function SellerConsolePage() {
         onNewConversation={() => router.push("/chat")}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          router.push("/chat");
+          void logoutSession().finally(() => {
+            setIsAuthenticated(false);
+            router.push("/chat");
+          });
         }}
       >
         <section className="h-full overflow-y-auto px-6 py-6">

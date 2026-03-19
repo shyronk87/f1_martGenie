@@ -1,4 +1,4 @@
-import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
 
 export type FavoriteProductItem = {
   id: string;
@@ -69,7 +69,7 @@ function buildAuthHeaders() {
 }
 
 export async function fetchFavoriteProducts(): Promise<FavoriteProductItem[]> {
-  const response = await fetch(`${getApiBaseUrl()}/favorites/products`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/favorites/products`, {
     headers: buildAuthHeaders(),
   });
   const payload = await parseJsonResponse<{ items: FavoriteProductItem[] }>(
@@ -82,7 +82,7 @@ export async function fetchFavoriteProducts(): Promise<FavoriteProductItem[]> {
 export async function createFavoriteProduct(
   payload: FavoriteProductCreateInput,
 ): Promise<FavoriteProductItem> {
-  const response = await fetch(`${getApiBaseUrl()}/favorites/products`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/favorites/products`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -94,7 +94,7 @@ export async function createFavoriteProduct(
 }
 
 export async function deleteFavoriteProduct(skuIdDefault: string): Promise<void> {
-  const response = await fetch(`${getApiBaseUrl()}/favorites/products/${encodeURIComponent(skuIdDefault)}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/favorites/products/${encodeURIComponent(skuIdDefault)}`, {
     method: "DELETE",
     headers: buildAuthHeaders(),
   });
@@ -102,7 +102,7 @@ export async function deleteFavoriteProduct(skuIdDefault: string): Promise<void>
 }
 
 export async function fetchFavoriteBundles(): Promise<FavoriteBundleItem[]> {
-  const response = await fetch(`${getApiBaseUrl()}/favorites/bundles`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/favorites/bundles`, {
     headers: buildAuthHeaders(),
   });
   const payload = await parseJsonResponse<{ items: FavoriteBundleItem[] }>(
@@ -115,7 +115,7 @@ export async function fetchFavoriteBundles(): Promise<FavoriteBundleItem[]> {
 export async function createFavoriteBundle(
   payload: FavoriteBundleCreateInput,
 ): Promise<FavoriteBundleItem> {
-  const response = await fetch(`${getApiBaseUrl()}/favorites/bundles`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/favorites/bundles`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -127,7 +127,7 @@ export async function createFavoriteBundle(
 }
 
 export async function deleteFavoriteBundle(bundleId: string): Promise<void> {
-  const response = await fetch(`${getApiBaseUrl()}/favorites/bundles/${encodeURIComponent(bundleId)}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/favorites/bundles/${encodeURIComponent(bundleId)}`, {
     method: "DELETE",
     headers: buildAuthHeaders(),
   });

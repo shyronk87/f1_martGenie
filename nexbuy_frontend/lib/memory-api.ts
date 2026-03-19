@@ -1,4 +1,4 @@
-import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
 
 export type OnboardingQuestion = {
   key: string;
@@ -115,14 +115,14 @@ async function parseJsonResponse<T>(response: Response, fallbackMessage: string)
 }
 
 export async function fetchMemoryProfile(): Promise<MemoryProfileResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/memory/profile`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/memory/profile`, {
     headers: authHeaders(),
   });
   return parseJsonResponse<MemoryProfileResponse>(response, "Could not load memory profile.");
 }
 
 export async function fetchOnboardingQuestions(): Promise<OnboardingQuestion[]> {
-  const response = await fetch(`${getApiBaseUrl()}/memory/onboarding/questions`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/memory/onboarding/questions`, {
     headers: authHeaders(),
   });
   return parseJsonResponse<OnboardingQuestion[]>(
@@ -132,7 +132,7 @@ export async function fetchOnboardingQuestions(): Promise<OnboardingQuestion[]> 
 }
 
 export async function saveMemoryProfile(payload: MemoryProfilePayload): Promise<MemoryProfileResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/memory/profile`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/memory/profile`, {
     method: "PUT",
     headers: {
       ...authHeaders(),

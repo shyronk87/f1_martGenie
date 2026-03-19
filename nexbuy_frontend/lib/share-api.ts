@@ -1,4 +1,4 @@
-import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
 
 export type ShareProductEmailInput = {
   sku_id_default: string;
@@ -44,7 +44,7 @@ function buildAuthHeaders() {
 export async function shareProductByEmail(
   payload: ShareProductEmailInput,
 ): Promise<ShareProductEmailOut> {
-  const response = await fetch(`${getApiBaseUrl()}/share/product/email`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/share/product/email`, {
     method: "POST",
     headers: buildAuthHeaders(),
     body: JSON.stringify(payload),
@@ -71,7 +71,7 @@ export async function shareProductByEmail(
 export async function shareBundleByEmail(
   payload: ShareBundleEmailInput,
 ): Promise<ShareBundleEmailOut> {
-  const response = await fetch(`${getApiBaseUrl()}/share/bundle/email`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/share/bundle/email`, {
     method: "POST",
     headers: buildAuthHeaders(),
     body: JSON.stringify(payload),

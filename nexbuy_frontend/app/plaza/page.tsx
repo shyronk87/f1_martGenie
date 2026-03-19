@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
+import { fetchCurrentUser, logoutSession, readAccessToken } from "@/lib/auth";
 import { readAuthUserId } from "@/lib/auth";
 import { createFavoriteProduct, deleteFavoriteProduct, fetchFavoriteProducts } from "@/lib/favorites-api";
 import { clearCurrentOrder, setOrderCheckout } from "@/lib/order-store";
@@ -610,10 +610,11 @@ export default function PlazaPage() {
         isAuthenticated={isAuthenticated}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          setRecommendations(null);
-          setFavoriteSkuSet(new Set());
+          void logoutSession().finally(() => {
+            setIsAuthenticated(false);
+            setRecommendations(null);
+            setFavoriteSkuSet(new Set());
+          });
         }}
       >
         <section className="mx-auto max-w-[1380px] px-6 py-10">

@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from .apple_router import router as apple_router
 from .auth_backend import auth_backend
 from .google_router import router as google_router
+from .session_router import router as session_router
 from .schemas import UserCreate, UserRead, UserUpdate
 from .users import fastapi_users
 
@@ -14,6 +15,7 @@ router.include_router(
     prefix="/auth/jwt",
     tags=["auth"],
 )
+router.include_router(session_router, prefix="/auth/session")
 router.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
     prefix="/auth",

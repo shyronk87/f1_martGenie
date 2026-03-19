@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
+import { fetchCurrentUser, logoutSession, readAccessToken } from "@/lib/auth";
 import {
   clearCurrentOrder,
   clearOrderCheckout,
@@ -182,9 +182,10 @@ export default function OrderPage() {
         isAuthenticated={isAuthenticated}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          router.push("/");
+          void logoutSession().finally(() => {
+            setIsAuthenticated(false);
+            router.push("/");
+          });
         }}
       >
         <section className="h-full overflow-y-auto px-6 py-6">

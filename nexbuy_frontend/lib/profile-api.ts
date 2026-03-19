@@ -1,4 +1,4 @@
-import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
 
 export type UserAddressPayload = {
   recipient_name: string | null;
@@ -49,14 +49,14 @@ async function parseJsonResponse<T>(response: Response, fallbackMessage: string)
 }
 
 export async function fetchUserAddresses(): Promise<UserAddressListResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/profile/addresses`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/profile/addresses`, {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<UserAddressListResponse>(response, "Could not load address information.");
 }
 
 export async function createUserAddress(payload: UserAddressPayload): Promise<UserAddressListResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/profile/addresses`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/profile/addresses`, {
     method: "POST",
     headers: buildAuthHeaders(),
     body: JSON.stringify(payload),
@@ -65,7 +65,7 @@ export async function createUserAddress(payload: UserAddressPayload): Promise<Us
 }
 
 export async function updateUserAddress(addressId: string, payload: UserAddressPayload): Promise<UserAddressListResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/profile/addresses/${addressId}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/profile/addresses/${addressId}`, {
     method: "PUT",
     headers: buildAuthHeaders(),
     body: JSON.stringify(payload),
@@ -74,7 +74,7 @@ export async function updateUserAddress(addressId: string, payload: UserAddressP
 }
 
 export async function setDefaultUserAddress(addressId: string): Promise<UserAddressListResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/profile/addresses/${addressId}/default`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/profile/addresses/${addressId}/default`, {
     method: "POST",
     headers: buildAuthHeaders(),
   });

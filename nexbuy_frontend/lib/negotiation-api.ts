@@ -1,4 +1,4 @@
-import { getBackendOrigin, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getBackendOrigin, readAccessToken } from "@/lib/auth";
 
 function getNegotiationApiBaseUrl() {
   return `${getBackendOrigin()}/api`;
@@ -103,7 +103,7 @@ export async function createNegotiationSession(payload: {
   buyerNote?: string;
   maxRounds?: number;
 }): Promise<NegotiationSession> {
-  const response = await fetch(`${getNegotiationApiBaseUrl()}/negotiation/sessions`, {
+  const response = await authenticatedFetch(`${getNegotiationApiBaseUrl()}/negotiation/sessions`, {
     method: "POST",
     headers: {
       ...buildAuthHeaders(),
@@ -124,7 +124,7 @@ export async function submitNegotiationOffer(payload: {
   buyerOffer?: number | null;
   buyerMessage?: string;
 }): Promise<NegotiationTurn> {
-  const response = await fetch(
+  const response = await authenticatedFetch(
     `${getNegotiationApiBaseUrl()}/negotiation/sessions/${payload.sessionId}/offer`,
     {
       method: "POST",
@@ -143,7 +143,7 @@ export async function submitNegotiationOffer(payload: {
 }
 
 export async function fetchNegotiationSession(sessionId: string): Promise<NegotiationSession> {
-  const response = await fetch(`${getNegotiationApiBaseUrl()}/negotiation/sessions/${sessionId}`, {
+  const response = await authenticatedFetch(`${getNegotiationApiBaseUrl()}/negotiation/sessions/${sessionId}`, {
     headers: buildAuthHeaders(),
   });
 
@@ -155,7 +155,7 @@ export async function runBuyerAgentNegotiation(payload: {
   targetPrice: number;
   maxAcceptablePrice: number;
 }): Promise<BuyerAgentRunResult> {
-  const response = await fetch(`${getNegotiationApiBaseUrl()}/agent-negotiation/run`, {
+  const response = await authenticatedFetch(`${getNegotiationApiBaseUrl()}/agent-negotiation/run`, {
     method: "POST",
     headers: {
       ...buildAuthHeaders(),
@@ -191,7 +191,7 @@ export async function cancelBuyerAgentNegotiation(runId: string): Promise<{
   cancelled: boolean;
   message: string;
 }> {
-  const response = await fetch(`${getNegotiationApiBaseUrl()}/agent-negotiation/run/${runId}/cancel`, {
+  const response = await authenticatedFetch(`${getNegotiationApiBaseUrl()}/agent-negotiation/run/${runId}/cancel`, {
     method: "POST",
     headers: buildAuthHeaders(),
   });
@@ -208,7 +208,7 @@ export async function streamBuyerAgentNegotiation(
   onEvent: (event: BuyerAgentStreamEvent) => void,
   options?: { signal?: AbortSignal },
 ): Promise<void> {
-  const response = await fetch(`${getNegotiationApiBaseUrl()}/agent-negotiation/run/stream`, {
+  const response = await authenticatedFetch(`${getNegotiationApiBaseUrl()}/agent-negotiation/run/stream`, {
     method: "POST",
     headers: {
       ...buildAuthHeaders(),

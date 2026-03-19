@@ -1,4 +1,4 @@
-import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
 import type {
   ChatMessage,
   MockOrderResponse,
@@ -41,7 +41,7 @@ function getChatStreamBaseUrl() {
 
 export async function createChatSession(projectId?: string | null): Promise<string> {
   if (chatMode === "real") {
-    const response = await fetch(`${getApiBaseUrl()}/chat/sessions`, {
+    const response = await authenticatedFetch(`${getApiBaseUrl()}/chat/sessions`, {
       method: "POST",
       headers: {
         ...buildAuthHeaders(),
@@ -64,7 +64,7 @@ export async function fetchChatHistory(projectId?: string | null): Promise<Histo
   if (projectId) {
     url.searchParams.set("project_id", projectId);
   }
-  const response = await fetch(url.toString(), {
+  const response = await authenticatedFetch(url.toString(), {
     headers: buildAuthHeaders(),
   });
   const payload = await parseJsonResponse<HistoryResponse>(
@@ -75,7 +75,7 @@ export async function fetchChatHistory(projectId?: string | null): Promise<Histo
 }
 
 export async function fetchChatSessionDump(sessionId: string): Promise<SessionDumpResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/chat/sessions/${sessionId}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/chat/sessions/${sessionId}`, {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<SessionDumpResponse>(response, "Could not load chat session.");
@@ -86,7 +86,7 @@ export async function sendChatMessage(
   content: string,
 ): Promise<{ messageId: string; taskId: string }> {
   if (chatMode === "real") {
-    const response = await fetch(
+    const response = await authenticatedFetch(
       `${getApiBaseUrl()}/chat/sessions/${sessionId}/messages`,
       {
         method: "POST",
@@ -159,7 +159,7 @@ export async function createMockOrder(payload: {
   paymentMethod?: string;
   shippingAddress?: string;
 }): Promise<MockOrderResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/chat/orders/mock`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/chat/orders/mock`, {
     method: "POST",
     headers: {
       ...buildAuthHeaders(),

@@ -1,4 +1,4 @@
-import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
 
 export type ProjectItem = {
   id: string;
@@ -68,7 +68,7 @@ export function readSelectedProjectServerSnapshot() {
 }
 
 export async function fetchProjects(): Promise<ProjectItem[]> {
-  const response = await fetch(`${getApiBaseUrl()}/projects`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/projects`, {
     headers: buildAuthHeaders(),
   });
   const payload = await parseJsonResponse<ProjectListResponse>(response, "Could not load projects.");
@@ -76,7 +76,7 @@ export async function fetchProjects(): Promise<ProjectItem[]> {
 }
 
 export async function createProject(payload: ProjectCreateInput): Promise<ProjectItem> {
-  const response = await fetch(`${getApiBaseUrl()}/projects`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/projects`, {
     method: "POST",
     headers: {
       ...buildAuthHeaders(),

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { clearAccessToken, fetchCurrentUser, readAccessToken } from "@/lib/auth";
+import { clearAccessToken, fetchCurrentUser, logoutSession, readAccessToken } from "@/lib/auth";
 import {
   deleteFavoriteBundle,
   deleteFavoriteProduct,
@@ -167,11 +167,12 @@ export default function FavoritesPage() {
         isAuthenticated={isAuthenticated}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          setFavoriteProducts([]);
-          setFavoriteBundles([]);
-          router.push("/chat");
+          void logoutSession().finally(() => {
+            setIsAuthenticated(false);
+            setFavoriteProducts([]);
+            setFavoriteBundles([]);
+            router.push("/chat");
+          });
         }}
       >
         <section className="h-full overflow-y-auto px-6 py-6">

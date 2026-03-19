@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import {
   clearAccessToken,
   fetchCurrentUser,
+  logoutSession,
   readAccessToken,
   readAuthUserId,
   saveAuthUserEmail,
@@ -747,9 +748,10 @@ export default function NegotiationPage() {
         isAuthenticated={isAuthenticated}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          router.push("/");
+          void logoutSession().finally(() => {
+            setIsAuthenticated(false);
+            router.push("/");
+          });
         }}
       >
       <div className="grid h-full min-h-screen w-full overflow-hidden xl:grid-cols-[minmax(0,1fr)_360px]">

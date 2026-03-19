@@ -6,6 +6,7 @@ import {
   clearAccessToken,
   fetchCurrentUser,
   isUnauthorizedAuthError,
+  logoutSession,
   readAccessToken,
 } from "@/lib/auth";
 import {
@@ -1227,9 +1228,10 @@ export default function ChatWorkspacePage() {
       onOpenAuth={() => setAuthOpen(true)}
       onSignOut={() => {
         clearSavedWorkspace();
-        clearAccessToken();
-        setIsAuthenticated(false);
-        router.push("/");
+        void logoutSession().finally(() => {
+          setIsAuthenticated(false);
+          router.push("/");
+        });
       }}
       onNewConversation={handleNewConversation}
     >

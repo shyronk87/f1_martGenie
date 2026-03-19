@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { clearAccessToken, fetchCurrentUser, readAccessToken, readAuthUserId } from "@/lib/auth";
+import { fetchCurrentUser, logoutSession, readAccessToken, readAuthUserId } from "@/lib/auth";
 import type { PlanOption } from "@/lib/chat-api";
 import type { ChatMessage, TimelineEvent } from "@/lib/chat-contract";
 import {
@@ -448,11 +448,12 @@ export default function RecommendationsPage() {
         isAuthenticated={isAuthenticated}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          setFavoriteSkuSet(new Set());
-          setFavoriteBundleIdSet(new Set());
-          router.push("/");
+          void logoutSession().finally(() => {
+            setIsAuthenticated(false);
+            setFavoriteSkuSet(new Set());
+            setFavoriteBundleIdSet(new Set());
+            router.push("/");
+          });
         }}
       >
         <section className="mx-auto max-w-[1480px] px-6 py-10">

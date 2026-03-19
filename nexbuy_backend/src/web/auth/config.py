@@ -6,6 +6,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/nexbuy_auth"
     jwt_secret: str = "change-this-secret"
     access_token_lifetime_seconds: int = 3600
+    refresh_token_secret: str = "change-this-refresh-secret"
+    refresh_token_lifetime_seconds: int = 2592000
+    refresh_cookie_name: str = "martgennie_refresh_token"
+    refresh_cookie_secure: bool = False
+    refresh_cookie_samesite: str = "lax"
     frontend_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     google_oauth_frontend_redirect_url: str = "http://localhost:3000/auth/callback"
     google_oauth_redirect_uri: str = "http://localhost:3000/api/auth/google/callback"

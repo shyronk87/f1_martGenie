@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { clearAccessToken, fetchCurrentUser, readAccessToken, type AuthUser } from "@/lib/auth";
+import { clearAccessToken, fetchCurrentUser, logoutSession, readAccessToken, type AuthUser } from "@/lib/auth";
 import {
   buildMemoryPayloadFromAnswers,
   fetchMemoryProfile,
@@ -226,9 +226,10 @@ export default function ProfilePage() {
         isAuthenticated={isAuthenticated}
         onOpenAuth={() => setAuthOpen(true)}
         onSignOut={() => {
-          clearAccessToken();
-          setIsAuthenticated(false);
-          router.push("/");
+          void logoutSession().finally(() => {
+            setIsAuthenticated(false);
+            router.push("/");
+          });
         }}
       >
         <section className="h-full overflow-y-auto px-6 py-6">

@@ -1,4 +1,4 @@
-import { getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
 
 export type PlazaShowcaseSummary = {
   id: string;
@@ -113,21 +113,21 @@ function buildAuthHeaders() {
 }
 
 export async function fetchPlazaShowcases(limit = 20): Promise<PlazaShowcaseSummary[]> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/showcase?limit=${limit}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/showcase?limit=${limit}`, {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<PlazaShowcaseSummary[]>(response, "Could not load plaza showcase.");
 }
 
 export async function fetchPlazaShowcaseDetail(showcaseId: string): Promise<PlazaShowcaseDetail> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/showcase/${showcaseId}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/showcase/${showcaseId}`, {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<PlazaShowcaseDetail>(response, "Could not load showcase detail.");
 }
 
 export async function seedMockPlazaShowcases(): Promise<SeedResponse> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/showcase/mock/seed`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/showcase/mock/seed`, {
     method: "POST",
     headers: buildAuthHeaders(),
   });
@@ -135,14 +135,14 @@ export async function seedMockPlazaShowcases(): Promise<SeedResponse> {
 }
 
 export async function fetchPlazaRecommendations(): Promise<PlazaRecommendations> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/recommendations/me`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/recommendations/me`, {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<PlazaRecommendations>(response, "Could not load personalized recommendations.");
 }
 
 export async function fetchMartGennieFeedback(page = 1, pageSize = 5): Promise<MartGennieFeedbackList> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback?page=${page}&page_size=${pageSize}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/feedback?page=${page}&page_size=${pageSize}`, {
     headers: buildAuthHeaders(),
   });
   return parseJsonResponse<MartGennieFeedbackList>(response, "Could not load MartGennie feedback.");
@@ -151,7 +151,7 @@ export async function fetchMartGennieFeedback(page = 1, pageSize = 5): Promise<M
 export async function createMartGennieFeedback(
   payload: MartGennieFeedbackCreateInput,
 ): Promise<MartGennieFeedbackItem> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/feedback`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -163,7 +163,7 @@ export async function createMartGennieFeedback(
 }
 
 export async function deleteMartGennieFeedback(feedbackId: string): Promise<void> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback/${feedbackId}`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/feedback/${feedbackId}`, {
     method: "DELETE",
     headers: buildAuthHeaders(),
   });
@@ -182,7 +182,7 @@ export async function deleteMartGennieFeedback(feedbackId: string): Promise<void
 export async function toggleMartGennieFeedbackLike(
   feedbackId: string,
 ): Promise<MartGennieFeedbackLikeOut> {
-  const response = await fetch(`${getApiBaseUrl()}/plaza/feedback/${feedbackId}/like`, {
+  const response = await authenticatedFetch(`${getApiBaseUrl()}/plaza/feedback/${feedbackId}/like`, {
     method: "POST",
     headers: buildAuthHeaders(),
   });

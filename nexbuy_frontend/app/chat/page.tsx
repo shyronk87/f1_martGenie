@@ -18,6 +18,14 @@ import {
   subscribeChatStream,
   type TimelineEvent,
 } from "@/lib/chat-api";
+import {
+  createFavoriteBundle,
+  createFavoriteProduct,
+  deleteFavoriteBundle,
+  deleteFavoriteProduct,
+  fetchFavoriteBundles,
+  fetchFavoriteProducts,
+} from "@/lib/favorites-api";
 import { clearCurrentOrder, setOrderCheckout } from "@/lib/order-store";
 import {
   buildMemoryPayloadFromAnswers,
@@ -27,8 +35,10 @@ import {
   type OnboardingQuestion,
 } from "@/lib/memory-api";
 import { readSelectedProjectId, saveSelectedProjectId } from "@/lib/project-api";
+import { shareBundleByEmail, shareProductByEmail } from "@/lib/share-api";
 import AuthModal from "@/src/components/AuthModal";
 import MemoryQuestionStepper from "@/src/components/MemoryQuestionStepper";
+import ProductShareModal from "@/src/components/ProductShareModal";
 import WorkspaceShell from "@/src/components/WorkspaceShell";
 
 type FriendlyEvent = {
@@ -287,6 +297,21 @@ export default function ChatWorkspacePage() {
   const [embeddedExpandedPlanIds, setEmbeddedExpandedPlanIds] = useState<Record<string, string[]>>({});
   const [isResultsPanelOpen, setIsResultsPanelOpen] = useState(false);
   const [resultsPanelWidth, setResultsPanelWidth] = useState(760);
+  const [favoriteBundleIdSet, setFavoriteBundleIdSet] = useState<Set<string>>(new Set());
+  const [favoriteSkuSet, setFavoriteSkuSet] = useState<Set<string>>(new Set());
+  const [isUpdatingFavoriteBundleId, setIsUpdatingFavoriteBundleId] = useState<string | null>(null);
+  const [isUpdatingFavoriteSku, setIsUpdatingFavoriteSku] = useState<string | null>(null);
+  const [shareTarget, setShareTarget] = useState<
+    | { type: "product"; sku: string; title: string }
+    | {
+        type: "bundle";
+        title: string;
+        summary: string;
+        totalPrice: number;
+        items: Array<{ title: string; price: number }>;
+      }
+    | null
+  >(null);
   const [status, setStatus] = useState("Preparing workspace...");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -525,6 +550,23 @@ export default function ChatWorkspacePage() {
         setError("");
         await fetchCurrentUser(token);
         setIsAuthenticated(true);
+        try {
+          const [favoriteProducts, favoriteBundles] = await Promise.all([
+            fetchFavoriteProducts(),
+            fetchFavoriteBundles(),
+          ]);
+          if (unmounted) {
+            return;
+          }
+          setFavoriteSkuSet(new Set(favoriteProducts.map((item) => item.sku_id_default)));
+          setFavoriteBundleIdSet(new Set(favoriteBundles.map((item) => item.bundle_id)));
+        } catch {
+          if (unmounted) {
+            return;
+          }
+          setFavoriteSkuSet(new Set());
+          setFavoriteBundleIdSet(new Set());
+        }
         const memory = await fetchMemoryProfile();
         if (memory.onboarding_required) {
           const questions = await fetchOnboardingQuestions();
@@ -563,6 +605,8 @@ export default function ChatWorkspacePage() {
       } catch (bootstrapError) {
         clearAccessToken();
         setIsAuthenticated(false);
+        setFavoriteSkuSet(new Set());
+        setFavoriteBundleIdSet(new Set());
         if (isUnauthorizedAuthError(bootstrapError)) {
           setError("");
           setStatus("Tell me your room, style, budget, and must-have pieces.");
@@ -1101,6 +1145,130 @@ export default function ChatWorkspacePage() {
     router.push("/order");
   }
 
+  function handleOpenProductShare(item: PlanOption["items"][number]) {
+    if (!isAuthenticated) {
+      setAuthOpen(true);
+      return;
+    }
+    setShareTarget({
+      type: "product",
+      sku: item.sku,
+      title: item.title,
+    });
+  }
+
+  function handleOpenBundleShare(plan: PlanOption) {
+    if (!isAuthenticated) {
+      setAuthOpen(true);
+      return;
+    }
+    setShareTarget({
+      type: "bundle",
+      title: plan.title,
+      summary: plan.explanation || plan.summary,
+      totalPrice: plan.totalPrice,
+      items: plan.items.map((item) => ({
+        title: item.title,
+        price: item.price,
+      })),
+    });
+  }
+
+  async function handleSubmitShare(recipientEmail: string) {
+    if (!shareTarget) {
+      return;
+    }
+    if (shareTarget.type === "product") {
+      await shareProductByEmail({
+        sku_id_default: shareTarget.sku,
+        recipient_email: recipientEmail,
+      });
+      return;
+    }
+
+    await shareBundleByEmail({
+      bundle_title: shareTarget.title,
+      summary: shareTarget.summary,
+      total_price: shareTarget.totalPrice,
+      recipient_email: recipientEmail,
+      items: shareTarget.items,
+    });
+  }
+
+  async function handleToggleFavoriteProduct(item: PlanOption["items"][number]) {
+    if (!isAuthenticated) {
+      setAuthOpen(true);
+      return;
+    }
+
+    setIsUpdatingFavoriteSku(item.sku);
+    try {
+      if (favoriteSkuSet.has(item.sku)) {
+        await deleteFavoriteProduct(item.sku);
+        setFavoriteSkuSet((current) => {
+          const next = new Set(current);
+          next.delete(item.sku);
+          return next;
+        });
+      } else {
+        await createFavoriteProduct({
+          sku_id_default: item.sku,
+          title: item.title,
+          category_label: item.categoryLabel ?? null,
+          sale_price: item.price,
+          image_url: item.imageUrl ?? null,
+          product_url: item.productUrl ?? null,
+          description_text: item.description ?? null,
+          recommendation_reason: item.reason,
+          specs: item.specs ?? {},
+          source_page: "chat",
+        });
+        setFavoriteSkuSet((current) => new Set([...current, item.sku]));
+      }
+    } finally {
+      setIsUpdatingFavoriteSku(null);
+    }
+  }
+
+  async function handleToggleFavoriteBundle(plan: PlanOption) {
+    if (!isAuthenticated) {
+      setAuthOpen(true);
+      return;
+    }
+
+    setIsUpdatingFavoriteBundleId(plan.id);
+    try {
+      if (favoriteBundleIdSet.has(plan.id)) {
+        await deleteFavoriteBundle(plan.id);
+        setFavoriteBundleIdSet((current) => {
+          const next = new Set(current);
+          next.delete(plan.id);
+          return next;
+        });
+      } else {
+        await createFavoriteBundle({
+          bundle_id: plan.id,
+          title: plan.title,
+          summary: plan.explanation || plan.summary,
+          total_price: plan.totalPrice,
+          source_session_id: sessionId,
+          source_page: "chat",
+          items: plan.items.map((item) => ({
+            sku: item.sku,
+            title: item.title,
+            price: item.price,
+            quantity: 1,
+            imageUrl: item.imageUrl ?? null,
+            categoryLabel: item.categoryLabel ?? null,
+          })),
+        });
+        setFavoriteBundleIdSet((current) => new Set([...current, plan.id]));
+      }
+    } finally {
+      setIsUpdatingFavoriteBundleId(null);
+    }
+  }
+
   function renderResultsPanel(snapshotId: string) {
     const snapshotPlans = packageSnapshots[snapshotId];
     if (!snapshotPlans || snapshotPlans.length === 0) {
@@ -1149,6 +1317,33 @@ export default function ChatWorkspacePage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
+                          <button
+                            aria-label="Share bundle by email"
+                            className="inline-flex h-9 w-9 items-center justify-center text-[20px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleOpenBundleShare(plan);
+                            }}
+                            type="button"
+                          >
+                            ✉
+                          </button>
+                          <button
+                            aria-label={favoriteBundleIdSet.has(plan.id) ? "Remove bundle from likes" : "Add bundle to likes"}
+                            className={`inline-flex h-9 w-9 items-center justify-center text-[22px] leading-none transition ${
+                              favoriteBundleIdSet.has(plan.id) ? "text-[#dc2626]" : "text-[#111827]"
+                            }`}
+                            disabled={isUpdatingFavoriteBundleId === plan.id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleToggleFavoriteBundle(plan);
+                            }}
+                            type="button"
+                          >
+                            <span aria-hidden="true">{favoriteBundleIdSet.has(plan.id) ? "♥" : "♡"}</span>
+                          </button>
+                        </div>
                         <div className="rounded-full bg-white/80 px-3 py-1.5 text-sm font-semibold text-[#123b5f]">
                           ${plan.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                         </div>
@@ -1180,6 +1375,27 @@ export default function ChatWorkspacePage() {
                             className="group relative z-0 flex flex-1 flex-col overflow-hidden rounded-[24px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.12)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.14)]"
                             key={`${plan.id}-${item.sku}`}
                           >
+                            <div className="flex items-center justify-end gap-2 px-5 pt-4">
+                              <button
+                                aria-label="Share by email"
+                                className="inline-flex h-8 w-8 items-center justify-center text-[24px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
+                                onClick={() => handleOpenProductShare(item)}
+                                type="button"
+                              >
+                                ✉
+                              </button>
+                              <button
+                                aria-label={favoriteSkuSet.has(item.sku) ? "Remove from likes" : "Add to likes"}
+                                className={`inline-flex h-8 w-8 items-center justify-center text-[26px] leading-none transition hover:-translate-y-0.5 ${
+                                  favoriteSkuSet.has(item.sku) ? "text-[#dc2626]" : "text-[#111827] hover:text-[#111827]"
+                                }`}
+                                disabled={isUpdatingFavoriteSku === item.sku}
+                                onClick={() => void handleToggleFavoriteProduct(item)}
+                                type="button"
+                              >
+                                <span aria-hidden="true">{favoriteSkuSet.has(item.sku) ? "♥" : "♡"}</span>
+                              </button>
+                            </div>
                             <div className="relative h-44 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
                               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
                               {item.imageUrl ? (
@@ -1776,6 +1992,13 @@ export default function ChatWorkspacePage() {
           </div>
         </div>
       ) : null}
+      <ProductShareModal
+        onClose={() => setShareTarget(null)}
+        onSubmit={handleSubmitShare}
+        open={Boolean(shareTarget)}
+        shareLabel={shareTarget?.type === "bundle" ? "bundle" : "product"}
+        title={shareTarget?.title ?? ""}
+      />
       <AuthModal
         onAuthSuccess={() => {
           setIsAuthenticated(true);

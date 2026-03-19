@@ -52,9 +52,7 @@ const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
 const CHAT_HISTORY_REFRESH_EVENT = "nexbuy.chat.history.updated";
 const NAV_ITEMS = [
   { label: "Chat", href: "/chat" },
-  { label: "Negotiation", href: "/negotiation" },
   { label: "Plaza", href: "/plaza" },
-  { label: "Seller", href: "/seller-console" },
 ];
 
 export default function WorkspaceShell({

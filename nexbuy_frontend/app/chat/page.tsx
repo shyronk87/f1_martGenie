@@ -55,15 +55,26 @@ const WORKSPACE_STORAGE_KEY = "nexbuy.chat.workspace";
 const CHAT_HISTORY_REFRESH_EVENT = "nexbuy.chat.history.updated";
 const LEGACY_AI_STATUS = "AI is analyzing your request...";
 const AGENT_ANALYZING_STATUS = "Agent is analyzing your request...";
-const STARTER_PROMPTS = [
-  {
-    title: "Example brief",
-    description:
-      "Modern minimalist living room furniture with a $5000 budget.",
-    prompt:
-      "I have a budget of $5000 for modern minimalist living room furniture. I mainly need a sectional sofa and a solid wood coffee table. I have a Golden Retriever, so the fabric needs to be scratch-resistant.",
-    highlights: ["Sectional sofa", "Solid wood coffee table", "Scratch-resistant fabric"],
-  },
+const QUICK_FOCUS_TAGS = [
+  { label: "Home & Furniture", icon: "🛋️" },
+  { label: "Best Price", icon: "⚡" },
+  { label: "Fast Shipping", icon: "🚚" },
+];
+
+const QUICK_QUERY_TAGS = [
+  { label: "Grey modular sofa under $900", icon: "🛋️" },
+  { label: "Bedside lamp with warm light", icon: "💡" },
+  { label: "Mid-century coffee table", icon: "🌿" },
+  { label: "King bed frame, solid wood", icon: "🛏️" },
+];
+
+const DISCOVERY_TAGS = [
+  { label: "Home & Furniture", badge: "Live", active: true, icon: "🛋️" },
+  { label: "Fashion", badge: "Soon", icon: "👟" },
+  { label: "Electronics", badge: "Soon", icon: "💻" },
+  { label: "Beauty", badge: "Soon", icon: "🧴" },
+  { label: "Kitchen", badge: "Soon", icon: "🍳" },
+  { label: "Gaming", badge: "Later", icon: "🎮" },
 ];
 
 function buildFriendlyEvent(event: TimelineEvent): FriendlyEvent {
@@ -822,11 +833,11 @@ export default function ChatWorkspacePage() {
         : "Refine the brief, add another room, or ask for a different mix...";
     const wrapperClass =
       which === "hero"
-        ? "mt-8 w-full rounded-[32px] border border-[#d9e0ea] bg-white px-5 py-1.5 shadow-[0_18px_45px_rgba(148,163,184,0.12)]"
+        ? "mt-8 w-full rounded-[32px] border border-[#d9e0ea] bg-white px-5 py-3 shadow-[0_18px_45px_rgba(148,163,184,0.12)]"
         : "mx-auto w-full max-w-[760px] rounded-[28px] border border-[#d7dee8] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-4 py-2 shadow-[0_12px_36px_rgba(148,163,184,0.12)]";
     const textareaClass =
       which === "hero"
-        ? "max-h-[180px] min-h-[24px] w-full resize-none border-none bg-transparent px-1 py-0 text-[15px] leading-6 text-[#111827] outline-none placeholder:text-[#98a2b3]"
+        ? "max-h-[180px] min-h-[34px] w-full resize-none border-none bg-transparent px-1 py-0.5 text-[15px] leading-6 text-[#111827] outline-none placeholder:text-[#98a2b3]"
         : "max-h-[220px] min-h-[40px] w-full resize-none border-none bg-transparent px-1 py-0.5 text-[15px] leading-6 text-[#111827] outline-none placeholder:text-[#98a2b3]";
     const toolbarClass =
       which === "hero"
@@ -919,6 +930,22 @@ export default function ChatWorkspacePage() {
               ) : null}
             </div>
 
+            {which === "hero" ? (
+              <div className="ml-1 flex flex-1 flex-wrap items-center gap-2">
+                {QUICK_FOCUS_TAGS.map((tag) => (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#d8e2ec] bg-[#f8fbff] px-3 py-1 text-xs font-semibold text-[#5f6f82]"
+                    key={tag.label}
+                  >
+                    <span className="text-[13px] leading-none">{tag.icon}</span>
+                    <span>{tag.label}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+
             <button
               className={`inline-flex h-11 w-11 items-center justify-center rounded-full text-lg text-white shadow-[0_16px_36px_rgba(15,23,42,0.18)] transition ${
                 isSending
@@ -992,38 +1019,42 @@ export default function ChatWorkspacePage() {
 
                   {renderComposer("hero")}
 
-                  <div className="mt-5 flex max-w-[760px] flex-wrap justify-center gap-2">
-                    {STARTER_PROMPTS.map((suggestion) => (
+                  <div className="mt-5 flex max-w-[760px] flex-wrap justify-center gap-2.5">
+                    {QUICK_QUERY_TAGS.map((query) => (
                       <button
-                        className="w-full max-w-[760px] rounded-[24px] border border-[#dde5ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-5 py-4 text-left transition hover:border-[#bfd4ec] hover:bg-[#f7fbff] hover:shadow-[0_14px_34px_rgba(148,163,184,0.12)]"
-                        key={suggestion.prompt}
-                        onClick={() => applyPromptSuggestion(suggestion.prompt)}
+                        className="inline-flex items-center gap-2 rounded-full border border-[#dde3ea] bg-white px-4 py-2 text-sm font-medium text-[#6b7280] shadow-[0_4px_14px_rgba(148,163,184,0.08)] transition hover:-translate-y-0.5 hover:border-[#bfd4ec] hover:text-[#111827]"
+                        key={query.label}
+                        onClick={() => applyPromptSuggestion(query.label)}
                         type="button"
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b97a8]">
-                              {suggestion.title}
-                            </p>
-                            <p className="mt-2 text-sm font-medium text-[#101828]">
-                              {suggestion.description}
-                            </p>
-                          </div>
-                          <span className="shrink-0 text-sm text-[#98a2b3]">↗</span>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {suggestion.highlights.map((highlight) => (
-                            <span
-                              className="rounded-full border border-[#d8e2ec] bg-white px-3 py-1 text-[11px] text-[#667085]"
-                              key={highlight}
-                            >
-                              {highlight}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="mt-3 line-clamp-2 text-xs leading-6 text-[#667085]">
-                          {suggestion.prompt}
-                        </p>
+                        <span className="text-[14px] leading-none">{query.icon}</span>
+                        <span>{query.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-10 flex max-w-[760px] flex-wrap justify-center gap-3">
+                    {DISCOVERY_TAGS.map((tag) => (
+                      <button
+                        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-[0_8px_24px_rgba(148,163,184,0.08)] transition hover:-translate-y-0.5 ${
+                          tag.active
+                            ? "border-[#9ddcc8] bg-[linear-gradient(180deg,#f5fffb_0%,#effbf6_100%)] text-[#16825d]"
+                            : "border-[#e0e6ed] bg-white text-[#6b7280]"
+                        }`}
+                        key={tag.label}
+                        type="button"
+                      >
+                        <span className="text-[15px] leading-none">{tag.icon}</span>
+                        <span>{tag.label}</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            tag.active
+                              ? "bg-[#dcfce7] text-[#16a34a]"
+                              : "bg-[#fff4d6] text-[#f59e0b]"
+                          }`}
+                        >
+                          {tag.badge}
+                        </span>
                       </button>
                     ))}
                   </div>

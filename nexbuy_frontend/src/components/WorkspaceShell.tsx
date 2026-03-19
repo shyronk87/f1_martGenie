@@ -73,6 +73,7 @@ export default function WorkspaceShell({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [newProjectTitle, setNewProjectTitle] = useState("");
+  const [newProjectSummary, setNewProjectSummary] = useState("");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [remoteHistoryItems, setRemoteHistoryItems] = useState<HistoryItem[]>([]);
   const accountMenuRef = useRef<HTMLDivElement | null>(null);
@@ -230,6 +231,7 @@ export default function WorkspaceShell({
       return;
     }
     setNewProjectTitle("");
+    setNewProjectSummary("");
     setProjectModalOpen(true);
   }
 
@@ -243,12 +245,13 @@ export default function WorkspaceShell({
       setIsCreatingProject(true);
       const nextProject = await createProject({
         title,
-        summary: "Untitled shopping workspace",
+        summary: newProjectSummary.trim() || null,
       });
       setProjects((current) => [nextProject, ...current]);
       saveSelectedProjectId(nextProject.id);
       setProjectModalOpen(false);
       setNewProjectTitle("");
+      setNewProjectSummary("");
       router.push("/chat");
     } finally {
       setIsCreatingProject(false);
@@ -310,9 +313,11 @@ export default function WorkspaceShell({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium">{project.title}</p>
-                            <p className="mt-1 truncate text-xs leading-5 text-[#7b8798]">
-                              {project.summary || "Untitled shopping workspace"}
-                            </p>
+                            {project.summary ? (
+                              <p className="mt-1 truncate text-xs leading-5 text-[#7b8798]">
+                                {project.summary}
+                              </p>
+                            ) : null}
                           </div>
                           <span className="shrink-0 pt-0.5 text-[11px] text-[#98a2b3]">
                             {new Date(project.updated_at).toLocaleDateString()}
@@ -483,11 +488,8 @@ export default function WorkspaceShell({
               New project
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#101828]">
-              Name this project
+              Create project
             </h2>
-            <p className="mt-2 text-sm leading-7 text-[#667085]">
-              Give this workspace a clear name so later chats, packages, and negotiations stay grouped together.
-            </p>
             <label className="mt-5 block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7c8da5]">
                 Project name
@@ -499,6 +501,18 @@ export default function WorkspaceShell({
                 placeholder="Living room refresh"
                 type="text"
                 value={newProjectTitle}
+              />
+            </label>
+            <label className="mt-4 block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#7c8da5]">
+                Description
+              </span>
+              <textarea
+                className="min-h-[96px] w-full resize-none rounded-[18px] border border-[#dce5ef] bg-white px-4 py-3 text-sm leading-6 text-[#101828] outline-none transition placeholder:text-[#98a2b3] focus:border-[#93c5fd] focus:ring-4 focus:ring-[#dbeafe]"
+                maxLength={500}
+                onChange={(event) => setNewProjectSummary(event.target.value)}
+                placeholder="Optional"
+                value={newProjectSummary}
               />
             </label>
             <div className="mt-6 flex items-center justify-end gap-3">

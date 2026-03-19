@@ -278,10 +278,15 @@ export default function ChatWorkspacePage() {
   const [prompt, setPrompt] = useState("");
   const [draftAttachments, setDraftAttachments] = useState<DraftAttachment[]>([]);
   const [openAttachmentMenu, setOpenAttachmentMenu] = useState<"hero" | "composer" | null>(null);
+  const [hoveredUserMessageId, setHoveredUserMessageId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageContent, setEditingMessageContent] = useState("");
   const [status, setStatus] = useState("Preparing workspace...");
   const [error, setError] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [runElapsedSec, setRunElapsedSec] = useState(0);
+  const [lastRunElapsedSec, setLastRunElapsedSec] = useState(0);
   const [thinkingExpanded, setThinkingExpanded] = useState(true);
   const [streamText, setStreamText] = useState("");
   const streamTextRef = useRef("");
@@ -530,13 +535,7 @@ export default function ChatWorkspacePage() {
     };
   }, [bootstrapNonce, isWorkspaceHydrated, requestedSessionId, sessionId]);
 
-  async function handleSend(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const content = prompt.trim();
-    if (!content || isSending) {
-      return;
-    }
-
+  async function submitPrompt(content: string, options?: { replaceMessageId?: string | null }) {
     const token = readAccessToken();
     if (!token) {
       setAuthOpen(true);
@@ -557,22 +556,41 @@ export default function ChatWorkspacePage() {
       }
     }
 
+    const userMessageId = options?.replaceMessageId ?? `user-${crypto.randomUUID()}`;
+    const userMessage: ChatMessage = {
+      id: userMessageId,
+      role: "user",
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
     setPrompt("");
     setDraftAttachments([]);
     setError("");
     setIsSending(true);
     setStreamText("");
     streamTextRef.current = "";
+    setTimeline([]);
+    setPlans([]);
+    setPackageSnapshots({});
+    setActivePlanId(null);
     setStatus(AGENT_ANALYZING_STATUS);
-    setMessages((current) => [
-      ...current,
-      {
-        id: `user-${crypto.randomUUID()}`,
-        role: "user",
-        content,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    setLastRunElapsedSec(0);
+    packageSnapshotIdRef.current = null;
+    plansRef.current = [];
+
+    if (options?.replaceMessageId) {
+      const targetIndex = messages.findIndex((message) => message.id === options.replaceMessageId);
+      if (targetIndex >= 0) {
+        setMessages([...messages.slice(0, targetIndex), userMessage]);
+      } else {
+        setMessages((current) => [...current, userMessage]);
+      }
+      setEditingMessageId(null);
+      setEditingMessageContent("");
+    } else {
+      setMessages((current) => [...current, userMessage]);
+    }
 
     try {
       const { taskId } = await sendChatMessage(activeSessionId, content);
@@ -630,6 +648,7 @@ export default function ChatWorkspacePage() {
         if (eventPayload.type === "error") {
           setError(eventPayload.error);
           setStatus("Pipeline returned an error.");
+          setLastRunElapsedSec(runElapsedSec);
           setIsSending(false);
           return;
         }
@@ -651,6 +670,7 @@ export default function ChatWorkspacePage() {
           }
           setStreamText("");
           streamTextRef.current = "";
+          setLastRunElapsedSec(runElapsedSec);
           setIsSending(false);
           setStatus("Done. You can refine requirements or ask for alternatives.");
           notifyHistoryRefresh();
@@ -688,12 +708,23 @@ export default function ChatWorkspacePage() {
     }
   }
 
+  async function handleSend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const content = prompt.trim();
+    if (!content || isSending) {
+      return;
+    }
+
+    await submitPrompt(content);
+  }
+
   function handleCancel() {
     unsubscribeRef.current?.();
     unsubscribeRef.current = null;
     setIsSending(false);
     setStreamText("");
     streamTextRef.current = "";
+    setLastRunElapsedSec(runElapsedSec);
     setStatus("Search canceled. You can send a new request.");
     setTimeline((current) => [
       {
@@ -910,7 +941,11 @@ export default function ChatWorkspacePage() {
 
             <div className="flex items-center gap-3 pt-0.5">
               <span className="text-xs font-medium text-[#98a2b3]">
-                {isSending ? formatElapsed(runElapsedSec) : `${displayedTimeline.length} steps`}
+                {isSending
+                  ? formatElapsed(runElapsedSec)
+                  : lastRunElapsedSec > 0
+                    ? formatElapsed(lastRunElapsedSec)
+                    : ""}
               </span>
               <span className={`text-sm text-[#98a2b3] transition ${thinkingExpanded ? "rotate-180" : ""}`}>⌄</span>
             </div>
@@ -1115,7 +1150,46 @@ export default function ChatWorkspacePage() {
     setSessionId(null);
     setStatus("Preparing workspace...");
     restoredWorkspaceRef.current = false;
+    setEditingMessageId(null);
+    setEditingMessageContent("");
+    setHoveredUserMessageId(null);
     setBootstrapNonce((current) => current + 1);
+  }
+
+  async function handleCopyUserMessage(messageId: string, content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(messageId);
+      window.setTimeout(() => {
+        setCopiedMessageId((current) => (current === messageId ? null : current));
+      }, 1200);
+    } catch {
+      setError("Could not copy this message.");
+    }
+  }
+
+  function handleStartEditMessage(messageId: string, content: string) {
+    if (isSending) {
+      return;
+    }
+
+    setEditingMessageId(messageId);
+    setEditingMessageContent(content);
+    setHoveredUserMessageId(messageId);
+  }
+
+  function handleCancelEditMessage() {
+    setEditingMessageId(null);
+    setEditingMessageContent("");
+  }
+
+  async function handleSubmitEditedMessage(messageId: string) {
+    const content = editingMessageContent.trim();
+    if (!content || isSending) {
+      return;
+    }
+
+    await submitPrompt(content, { replaceMessageId: messageId });
   }
 
   return (
@@ -1201,11 +1275,113 @@ export default function ChatWorkspacePage() {
                         message.role === "user" ? "flex justify-end" : "block"
                       }`}
                       key={message.id}
+                      onMouseEnter={() => {
+                        if (message.role === "user") {
+                          setHoveredUserMessageId(message.id);
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        if (message.role === "user") {
+                          setHoveredUserMessageId((current) => (current === message.id ? null : current));
+                        }
+                      }}
                       style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif" }}
                     >
                       {message.role === "user" ? (
-                        <div className="max-w-[72%] rounded-[22px] bg-[#f1f1f1] px-4 py-3 text-[#111827]">
-                          <p>{message.content}</p>
+                        <div className="flex max-w-[72%] flex-col items-end gap-2">
+                          {editingMessageId === message.id ? (
+                            <div className="w-full rounded-[24px] border border-[#d8dee8] bg-[#f7f8fa] px-4 py-3 shadow-[0_10px_30px_rgba(148,163,184,0.12)]">
+                              <textarea
+                                className="min-h-[84px] w-full resize-none border-none bg-transparent text-[15px] leading-7 text-[#111827] outline-none placeholder:text-[#98a2b3]"
+                                onChange={(event) => setEditingMessageContent(event.target.value)}
+                                rows={3}
+                                value={editingMessageContent}
+                              />
+                              <div className="mt-3 flex items-center justify-end gap-2">
+                                <button
+                                  className="inline-flex items-center rounded-full border border-[#d5dbe5] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#475467] transition hover:border-[#c6d3e0] hover:bg-[#f8fafc]"
+                                  onClick={handleCancelEditMessage}
+                                  type="button"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  className="inline-flex items-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                                  disabled={!editingMessageContent.trim() || isSending}
+                                  onClick={() => handleSubmitEditedMessage(message.id)}
+                                  type="button"
+                                >
+                                  Send
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-full rounded-[22px] bg-[#f1f1f1] px-4 py-3 text-[#111827]">
+                              <p>{message.content}</p>
+                            </div>
+                          )}
+
+                          {hoveredUserMessageId === message.id && editingMessageId !== message.id ? (
+                            <div className="mt-0.5 flex items-center justify-end gap-1.5 pr-1">
+                              <button
+                                aria-label="Copy message"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
+                                onClick={() => handleCopyUserMessage(message.id, message.content)}
+                                type="button"
+                              >
+                                {copiedMessageId === message.id ? (
+                                  <svg aria-hidden="true" className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24">
+                                    <path
+                                      d="M6 12.5 10 16l8-9"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="1.9"
+                                    />
+                                  </svg>
+                                ) : (
+                                  <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
+                                    <rect
+                                      height="11"
+                                      rx="2.5"
+                                      stroke="currentColor"
+                                      strokeWidth="1.7"
+                                      width="11"
+                                      x="9"
+                                      y="9"
+                                    />
+                                    <path
+                                      d="M15 7.5V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15h1"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeWidth="1.7"
+                                    />
+                                  </svg>
+                                )}
+                              </button>
+                              <button
+                                aria-label="Edit message"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
+                                onClick={() => handleStartEditMessage(message.id, message.content)}
+                                type="button"
+                              >
+                                <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
+                                  <path
+                                    d="m14.5 5.5 4 4"
+                                    stroke="currentColor"
+                                    strokeLinecap="round"
+                                    strokeWidth="1.7"
+                                  />
+                                  <path
+                                    d="M6 18.5 9.5 18l8.2-8.2a1.8 1.8 0 0 0 0-2.6l-1-1a1.8 1.8 0 0 0-2.6 0L6 14.5l-.5 4Z"
+                                    stroke="currentColor"
+                                    strokeLinejoin="round"
+                                    strokeWidth="1.7"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="max-w-none text-[#1f2937]">

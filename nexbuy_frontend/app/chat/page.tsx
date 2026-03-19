@@ -875,6 +875,14 @@ export default function ChatWorkspacePage() {
     return deduped;
   }, [timeline]);
   const hasConversation = renderedMessages.length > 0;
+  const latestCompletedAssistantMessageId = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.role === "assistant") {
+        return messages[index]?.id ?? null;
+      }
+    }
+    return null;
+  }, [messages]);
   const visibleThinkingSteps = thinkingExpanded ? displayedTimeline : displayedTimeline.slice(0, 1);
   const currentThinkingTitle =
     displayedTimeline.length === 0 ? "Working through your request" : displayedTimeline[0]?.friendly.title ?? "Working through your request";
@@ -1307,165 +1315,162 @@ export default function ChatWorkspacePage() {
               ) : (
                 <>
                   {messages.map((message) => (
-                    <article
-                      className={`mx-auto w-full max-w-[760px] text-sm leading-8 text-[#111827] md:text-[15px] ${
-                        message.role === "user" ? "flex justify-end" : "block"
-                      }`}
-                      key={message.id}
-                      onMouseEnter={() => {
-                        if (message.role === "user") {
-                          setHoveredUserMessageId(message.id);
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        if (message.role === "user") {
-                          setHoveredUserMessageId((current) => (current === message.id ? null : current));
-                        }
-                      }}
-                      style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif" }}
-                    >
-                      {message.role === "user" ? (
-                        <div
-                          className={`flex flex-col items-end gap-2 ${
-                            editingMessageId === message.id ? "w-full max-w-[760px]" : "max-w-[72%]"
-                          }`}
-                        >
-                          {editingMessageId === message.id ? (
-                            <div className="w-full rounded-[28px] border border-[#d8dee8] bg-[#f7f8fa] px-4 py-3 shadow-[0_10px_30px_rgba(148,163,184,0.12)]">
-                              <textarea
-                                className="min-h-[34px] w-full resize-none border-none bg-transparent text-[15px] leading-6 text-[#111827] outline-none placeholder:text-[#98a2b3]"
-                                onChange={(event) => setEditingMessageContent(event.target.value)}
-                                rows={1}
-                                value={editingMessageContent}
-                              />
-                              <div className="mt-2 flex items-center justify-end gap-2">
+                    <div key={message.id}>
+                      {message.id === latestCompletedAssistantMessageId ? renderThinkingBlock() : null}
+                      <article
+                        className={`mx-auto w-full max-w-[760px] text-sm leading-8 text-[#111827] md:text-[15px] ${
+                          message.role === "user" ? "flex justify-end" : "block"
+                        }`}
+                        style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif" }}
+                      >
+                        {message.role === "user" ? (
+                          <div
+                            className={`flex flex-col items-end gap-2 ${
+                              editingMessageId === message.id ? "w-full max-w-[760px]" : "max-w-[72%]"
+                            }`}
+                          >
+                            {editingMessageId === message.id ? (
+                              <div className="w-full rounded-[28px] border border-[#d8dee8] bg-[#f7f8fa] px-4 py-3 shadow-[0_10px_30px_rgba(148,163,184,0.12)]">
+                                <textarea
+                                  className="min-h-[34px] w-full resize-none border-none bg-transparent text-[15px] leading-6 text-[#111827] outline-none placeholder:text-[#98a2b3]"
+                                  onChange={(event) => setEditingMessageContent(event.target.value)}
+                                  rows={1}
+                                  value={editingMessageContent}
+                                />
+                                <div className="mt-2 flex items-center justify-end gap-2">
+                                  <button
+                                    className="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium text-[#667085] transition hover:bg-white hover:text-[#344054]"
+                                    onClick={handleCancelEditMessage}
+                                    type="button"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+                                    disabled={!editingMessageContent.trim() || isSending}
+                                    onClick={() => handleSubmitEditedMessage(message.id)}
+                                    type="button"
+                                  >
+                                    <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                      <path
+                                        d="M12 5v11"
+                                        stroke="currentColor"
+                                        strokeLinecap="round"
+                                        strokeWidth="1.9"
+                                      />
+                                      <path
+                                        d="m7.5 9.5 4.5-4.5 4.5 4.5"
+                                        stroke="currentColor"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="1.9"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className="w-full rounded-[22px] bg-[#f1f1f1] px-4 py-3 text-[#111827]"
+                                onMouseEnter={() => setHoveredUserMessageId(message.id)}
+                                onMouseLeave={() =>
+                                  setHoveredUserMessageId((current) => (current === message.id ? null : current))
+                                }
+                              >
+                                <p>{message.content}</p>
+                              </div>
+                            )}
+
+                            {hoveredUserMessageId === message.id && editingMessageId !== message.id ? (
+                              <div className="mt-0.5 flex items-center justify-end gap-1.5 pr-1">
                                 <button
-                                  className="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-medium text-[#667085] transition hover:bg-white hover:text-[#344054]"
-                                  onClick={handleCancelEditMessage}
+                                  aria-label="Copy message"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
+                                  onClick={() => handleCopyUserMessage(message.id, message.content)}
                                   type="button"
                                 >
-                                  Cancel
+                                  {copiedMessageId === message.id ? (
+                                    <svg aria-hidden="true" className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24">
+                                      <path
+                                        d="M6 12.5 10 16l8-9"
+                                        stroke="currentColor"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="1.9"
+                                      />
+                                    </svg>
+                                  ) : (
+                                    <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
+                                      <rect
+                                        height="11"
+                                        rx="2.5"
+                                        stroke="currentColor"
+                                        strokeWidth="1.7"
+                                        width="11"
+                                        x="9"
+                                        y="9"
+                                      />
+                                      <path
+                                        d="M15 7.5V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15h1"
+                                        stroke="currentColor"
+                                        strokeLinecap="round"
+                                        strokeWidth="1.7"
+                                      />
+                                    </svg>
+                                  )}
                                 </button>
                                 <button
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
-                                  disabled={!editingMessageContent.trim() || isSending}
-                                  onClick={() => handleSubmitEditedMessage(message.id)}
+                                  aria-label="Edit message"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
+                                  onClick={() => handleStartEditMessage(message.id, message.content)}
                                   type="button"
                                 >
-                                  <svg aria-hidden="true" className="h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                  <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
                                     <path
-                                      d="M12 5v11"
+                                      d="m14.5 5.5 4 4"
                                       stroke="currentColor"
                                       strokeLinecap="round"
-                                      strokeWidth="1.9"
+                                      strokeWidth="1.7"
                                     />
                                     <path
-                                      d="m7.5 9.5 4.5-4.5 4.5 4.5"
+                                      d="M6 18.5 9.5 18l8.2-8.2a1.8 1.8 0 0 0 0-2.6l-1-1a1.8 1.8 0 0 0-2.6 0L6 14.5l-.5 4Z"
                                       stroke="currentColor"
-                                      strokeLinecap="round"
                                       strokeLinejoin="round"
-                                      strokeWidth="1.9"
+                                      strokeWidth="1.7"
                                     />
                                   </svg>
                                 </button>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="w-full rounded-[22px] bg-[#f1f1f1] px-4 py-3 text-[#111827]">
-                              <p>{message.content}</p>
-                            </div>
-                          )}
-
-                          {hoveredUserMessageId === message.id && editingMessageId !== message.id ? (
-                            <div className="mt-0.5 flex items-center justify-end gap-1.5 pr-1">
-                              <button
-                                aria-label="Copy message"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
-                                onClick={() => handleCopyUserMessage(message.id, message.content)}
-                                type="button"
-                              >
-                                {copiedMessageId === message.id ? (
-                                  <svg aria-hidden="true" className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24">
-                                    <path
-                                      d="M6 12.5 10 16l8-9"
-                                      stroke="currentColor"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth="1.9"
-                                    />
-                                  </svg>
-                                ) : (
-                                  <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
-                                    <rect
-                                      height="11"
-                                      rx="2.5"
-                                      stroke="currentColor"
-                                      strokeWidth="1.7"
-                                      width="11"
-                                      x="9"
-                                      y="9"
-                                    />
-                                    <path
-                                      d="M15 7.5V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15h1"
-                                      stroke="currentColor"
-                                      strokeLinecap="round"
-                                      strokeWidth="1.7"
-                                    />
-                                  </svg>
-                                )}
-                              </button>
-                              <button
-                                aria-label="Edit message"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
-                                onClick={() => handleStartEditMessage(message.id, message.content)}
-                                type="button"
-                              >
-                                <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
-                                  <path
-                                    d="m14.5 5.5 4 4"
-                                    stroke="currentColor"
-                                    strokeLinecap="round"
-                                    strokeWidth="1.7"
-                                  />
-                                  <path
-                                    d="M6 18.5 9.5 18l8.2-8.2a1.8 1.8 0 0 0 0-2.6l-1-1a1.8 1.8 0 0 0-2.6 0L6 14.5l-.5 4Z"
-                                    stroke="currentColor"
-                                    strokeLinejoin="round"
-                                    strokeWidth="1.7"
-                                  />
-                                </svg>
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="max-w-none text-[#1f2937]">
-                          <p>{message.content}</p>
-                        </div>
-                      )}
-                      {message.role === "assistant" && message.packageSnapshotId ? (
-                        <button
-                          className="mt-4 inline-flex items-center rounded-full border border-[#d6e4f5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f4f78] transition hover:border-[#bfd4ec] hover:bg-[#eef6ff]"
-                          onClick={() =>
-                            router.push(
-                              `/recommendations?snapshot=${encodeURIComponent(message.packageSnapshotId as string)}`,
-                            )
-                          }
-                          type="button"
-                        >
-                          View packages
-                        </button>
-                      ) : null}
-                    </article>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="max-w-none text-[#1f2937]">
+                            <p>{message.content}</p>
+                          </div>
+                        )}
+                        {message.role === "assistant" && message.packageSnapshotId ? (
+                          <button
+                            className="mt-4 inline-flex items-center rounded-full border border-[#d6e4f5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1f4f78] transition hover:border-[#bfd4ec] hover:bg-[#eef6ff]"
+                            onClick={() =>
+                              router.push(
+                                `/recommendations?snapshot=${encodeURIComponent(message.packageSnapshotId as string)}`,
+                              )
+                            }
+                            type="button"
+                          >
+                            View packages
+                          </button>
+                        ) : null}
+                      </article>
+                    </div>
                   ))}
-
-                  {renderThinkingBlock()}
 
                   {isSending ? (
                     <article
                       className="mx-auto w-full max-w-[760px] text-sm leading-8 text-[#111827] md:text-[15px]"
                       style={{ fontFamily: "'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif" }}
                     >
+                      {renderThinkingBlock()}
                       <div className="max-w-none text-[#1f2937]">
                         {streamText ? (
                           <p className="relative">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { fetchCurrentUser, logoutSession, readAccessToken } from "@/lib/auth";
 import { createFavoriteProduct, deleteFavoriteProduct, fetchFavoriteProducts } from "@/lib/favorites-api";
 import { clearCurrentOrder, setOrderCheckout } from "@/lib/order-store";
@@ -17,6 +17,8 @@ import {
 } from "@/lib/product-api";
 import AuthModal from "@/src/components/AuthModal";
 import WorkspaceShell from "@/src/components/WorkspaceShell";
+
+export const runtime = "edge";
 
 function formatMoney(value: number | null | undefined, currencySymbol = "$") {
   if (typeof value !== "number") {
@@ -66,7 +68,7 @@ function renderStars(value: number, interactive = false, onSelect?: (next: numbe
   );
 }
 
-export default function ProductDetailPage() {
+function ProductDetailPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams<{ sku: string }>();
@@ -742,5 +744,13 @@ export default function ProductDetailPage() {
       </WorkspaceShell>
       <AuthModal onAuthSuccess={() => setIsAuthenticated(true)} onClose={() => setAuthOpen(false)} open={authOpen} />
     </>
+  );
+}
+
+export default function ProductDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProductDetailPageContent />
+    </Suspense>
   );
 }

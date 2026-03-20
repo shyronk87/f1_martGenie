@@ -330,6 +330,7 @@ function ChatWorkspacePageContent() {
   const [isSavingOnboarding, setIsSavingOnboarding] = useState(false);
   const [bootstrapNonce, setBootstrapNonce] = useState(0);
   const [prompt, setPrompt] = useState("");
+  const [selectedFocusTags, setSelectedFocusTags] = useState<string[]>([]);
   const [draftAttachments, setDraftAttachments] = useState<DraftAttachment[]>([]);
   const [openAttachmentMenu, setOpenAttachmentMenu] = useState<"hero" | "composer" | null>(null);
   const [hoveredUserMessageId, setHoveredUserMessageId] = useState<string | null>(null);
@@ -1711,13 +1712,20 @@ function ChatWorkspacePageContent() {
             {which === "hero" ? (
               <div className="ml-1 flex flex-1 flex-wrap items-center gap-2">
                 {QUICK_FOCUS_TAGS.map((tag) => (
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#d8e2ec] bg-[#f8fbff] px-3 py-1 text-xs font-semibold text-[#5f6f82]"
+                  <button
+                    aria-pressed={selectedFocusTags.includes(tag.label)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      selectedFocusTags.includes(tag.label)
+                        ? "border-[#90b1d8] bg-[#eaf3ff] text-[#204a78] shadow-[0_8px_20px_rgba(144,177,216,0.18)]"
+                        : "border-[#d8e2ec] bg-[#f8fbff] text-[#5f6f82] hover:border-[#bfd3e6] hover:bg-[#f3f8fd] hover:text-[#3f556d]"
+                    }`}
                     key={tag.label}
+                    onClick={() => toggleFocusTag(tag.label)}
+                    type="button"
                   >
                     <span className="text-[13px] leading-none">{tag.icon}</span>
                     <span>{tag.label}</span>
-                  </span>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -1752,6 +1760,7 @@ function ChatWorkspacePageContent() {
     setPackageSnapshots({});
     setActivePlanId(null);
     setPrompt("");
+    setSelectedFocusTags([]);
     setError("");
     setStreamText("");
     streamTextRef.current = "";
@@ -1763,6 +1772,14 @@ function ChatWorkspacePageContent() {
     setEditingMessageContent("");
     setHoveredUserMessageId(null);
     setBootstrapNonce((current) => current + 1);
+  }
+
+  function toggleFocusTag(label: string) {
+    setSelectedFocusTags((current) =>
+      current.includes(label)
+        ? current.filter((item) => item !== label)
+        : [...current, label],
+    );
   }
 
   async function handleCopyUserMessage(messageId: string, content: string) {

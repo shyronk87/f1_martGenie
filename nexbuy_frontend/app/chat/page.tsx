@@ -97,10 +97,8 @@ const QUICK_FOCUS_TAGS = [
 ];
 
 const QUICK_QUERY_TAGS = [
-  { label: "Grey modular sofa under $900", icon: "🛋️" },
-  { label: "Bedside lamp with warm light", icon: "💡" },
-  { label: "Mid-century coffee table", icon: "🌿" },
-  { label: "King bed frame, solid wood", icon: "🛏️" },
+  { label: "Warm bedside lamp under $180, soft ambient light", icon: "💡" },
+  { label: "Mid-century walnut coffee table under $450", icon: "☕" },
 ];
 
 const DISCOVERY_TAGS = [

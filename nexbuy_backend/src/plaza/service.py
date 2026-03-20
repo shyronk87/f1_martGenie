@@ -203,14 +203,19 @@ def _build_recommendation_filters(profile: Any) -> QueryFilters:
 
 
 def _build_product_reason(product: Any, profile: Any) -> tuple[str, list[str]]:
+    def read(field: str) -> Any:
+        if isinstance(product, dict):
+            return product.get(field)
+        return getattr(product, field, None)
+
     tags: list[str] = []
     searchable = " ".join(
         [
-            str(product.title or ""),
-            str(product.category_name_1 or ""),
-            str(product.category_name_2 or ""),
-            str(product.category_name_3 or ""),
-            str(product.category_name_4 or ""),
+            str(read("title") or ""),
+            str(read("category_name_1") or ""),
+            str(read("category_name_2") or ""),
+            str(read("category_name_3") or ""),
+            str(read("category_name_4") or ""),
         ]
     ).lower()
 
@@ -230,12 +235,12 @@ def _build_product_reason(product: Any, profile: Any) -> tuple[str, list[str]]:
         tags.append(profile.price_philosophy)
 
     tags = _dedupe_keep_order(tags)[:3]
-    product_type = product.category_name_3 or product.category_name_2 or product.category_name_1 or "piece"
+    product_type = read("category_name_3") or read("category_name_2") or read("category_name_1") or "piece"
     product_type = str(product_type).strip().lower()
     style = profile.style_preferences[0] if profile.style_preferences else None
     room = profile.room_priorities[0] if profile.room_priorities else None
     philosophy = (profile.price_philosophy or "").lower()
-    price = _money(getattr(product, "sale_price", None))
+    price = _money(read("sale_price"))
     price_text = f"${price:,.0f}" if price > 0 else "this price point"
 
     reason: str
@@ -263,6 +268,11 @@ def _build_product_reason(product: Any, profile: Any) -> tuple[str, list[str]]:
 
 
 def _recommendation_group_key(product: Any) -> str:
+    if isinstance(product, dict):
+        return (
+            str(product.get("category_name_2") or product.get("category_name_1") or "Recommended").strip()
+            or "Recommended"
+        )
     return str(product.category_name_2 or product.category_name_1 or "Recommended").strip() or "Recommended"
 
 
@@ -819,13 +829,37 @@ async def get_memory_recommendations(
         )
 
     profile = memory_response.profile
-    filters = _build_recommendation_filters(profile)
-    products = await query_products(filters)
-    selected_products = _select_grouped_recommendations(products)
+    # Plaza favors fast, good-enough recommendations over deep retrieval.
+    # Pull a pre-ranked slice directly from the catalog instead of running the
+    # heavier query pipeline on every page load.
+    seed_products = await _fetch_seed_products(session, limit=18)
+    selected_products = _select_grouped_recommendations(seed_products)
 
     recommendation_products: list[PlazaRecommendationProduct] = []
     for product in selected_products:
         reason, matched_tags = _build_product_reason(product, profile)
+        if isinstance(product, dict):
+            recommendation_products.append(
+                PlazaRecommendationProduct(
+                    sku_id_default=str(product.get("sku_id_default") or ""),
+                    spu_id=product.get("spu_id"),
+                    title=str(product.get("title") or ""),
+                    description_text=product.get("description_text"),
+                    category_name_1=product.get("category_name_1"),
+                    category_name_2=product.get("category_name_2"),
+                    category_name_3=product.get("category_name_3"),
+                    category_name_4=product.get("category_name_4"),
+                    sale_price=_money(product.get("sale_price")),
+                    original_price=_money(product.get("original_price")),
+                    stock_status_text=product.get("stock_status_text"),
+                    main_image_url=product.get("main_image_url"),
+                    product_url=product.get("product_url"),
+                    specs=product.get("specs"),
+                    recommendation_reason=reason,
+                    matched_memory_tags=matched_tags,
+                )
+            )
+            continue
         recommendation_products.append(
             PlazaRecommendationProduct(
                 sku_id_default=product.sku_id_default,

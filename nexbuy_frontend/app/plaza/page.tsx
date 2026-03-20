@@ -150,26 +150,24 @@ export default function PlazaPage() {
             if (!cancelled) {
               setIsAuthenticated(true);
             }
-            try {
-              const favorites = await fetchFavoriteProducts();
-              if (!cancelled) {
-                setFavoriteSkuSet(new Set(favorites.map((item) => item.sku_id_default)));
-              }
-            } catch {
-              if (!cancelled) {
+            const [favoritesResult, recommendationResult] = await Promise.allSettled([
+              fetchFavoriteProducts(),
+              fetchPlazaRecommendations(),
+            ]);
+
+            if (!cancelled) {
+              if (favoritesResult.status === "fulfilled") {
+                setFavoriteSkuSet(new Set(favoritesResult.value.map((item) => item.sku_id_default)));
+              } else {
                 setFavoriteSkuSet(new Set());
               }
-            }
-            try {
-              const recommendationPayload = await fetchPlazaRecommendations();
-              if (!cancelled) {
-                setRecommendations(recommendationPayload);
-              }
-            } catch (recommendationLoadError) {
-              if (!cancelled) {
+
+              if (recommendationResult.status === "fulfilled") {
+                setRecommendations(recommendationResult.value);
+              } else {
                 setRecommendationError(
-                  recommendationLoadError instanceof Error
-                    ? recommendationLoadError.message
+                  recommendationResult.reason instanceof Error
+                    ? recommendationResult.reason.message
                     : "Could not load personalized recommendations.",
                 );
               }

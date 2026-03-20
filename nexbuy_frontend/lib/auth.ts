@@ -35,7 +35,6 @@ const USER_EMAIL_KEY = "nexbuy.auth.user_email";
 const USER_ID_KEY = "nexbuy.auth.user_id";
 const OAUTH_RETURN_TO_KEY = "nexbuy.auth.return_to";
 const DEFAULT_API_BASE_URL = "/api";
-const DEFAULT_BACKEND_ORIGIN = "http://127.0.0.1:8000";
 export const AUTH_STATE_CHANGE_EVENT = "nexbuy.auth.changed";
 
 export function getApiBaseUrl() {
@@ -45,9 +44,36 @@ export function getApiBaseUrl() {
   return configuredBaseUrl.replace(/\/+$/, "");
 }
 
+function isLocalHost(hostname: string | null | undefined) {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function buildBackendOriginConfigError(configuredOrigin: string | undefined) {
+  if (!configuredOrigin) {
+    return new Error(
+      "Missing NEXT_PUBLIC_BACKEND_ORIGIN. Set it to the deployed backend origin before building the frontend.",
+    );
+  }
+
+  if (typeof window !== "undefined") {
+    const currentHost = window.location.hostname;
+    const parsedOrigin = new URL(configuredOrigin);
+    if (!isLocalHost(currentHost) && isLocalHost(parsedOrigin.hostname)) {
+      return new Error(
+        `Invalid NEXT_PUBLIC_BACKEND_ORIGIN: ${configuredOrigin}. A deployed frontend cannot point to localhost or 127.0.0.1.`,
+      );
+    }
+  }
+
+  return null;
+}
+
 export function getBackendOrigin() {
-  const configuredOrigin =
-    process.env.NEXT_PUBLIC_BACKEND_ORIGIN ?? DEFAULT_BACKEND_ORIGIN;
+  const configuredOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN;
+  const configError = buildBackendOriginConfigError(configuredOrigin);
+  if (configError) {
+    throw configError;
+  }
 
   return configuredOrigin.replace(/\/+$/, "");
 }

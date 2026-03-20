@@ -1,4 +1,4 @@
-import { authenticatedFetch, getApiBaseUrl, readAccessToken } from "@/lib/auth";
+import { authenticatedFetch, getApiBaseUrl, getBackendOrigin, readAccessToken } from "@/lib/auth";
 import type {
   ChatMessage,
   MockOrderResponse,
@@ -29,14 +29,11 @@ type SessionDumpResponse = {
 
 const DEFAULT_CHAT_MODE = "mock";
 const chatMode = (process.env.NEXT_PUBLIC_CHAT_MODE ?? DEFAULT_CHAT_MODE).toLowerCase();
-const DEFAULT_STREAM_BACKEND_ORIGIN = "http://127.0.0.1:8000";
 
 type StreamHandler = (event: StreamEvent) => void;
 
 function getChatStreamBaseUrl() {
-  const configuredOrigin =
-    process.env.NEXT_PUBLIC_BACKEND_ORIGIN ?? DEFAULT_STREAM_BACKEND_ORIGIN;
-  return `${configuredOrigin.replace(/\/+$/, "")}/api`;
+  return `${getBackendOrigin()}/api`;
 }
 
 export async function createChatSession(projectId?: string | null): Promise<string> {

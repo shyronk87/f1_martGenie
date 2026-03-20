@@ -1909,7 +1909,9 @@ function ChatWorkspacePageContent() {
                 <>
                   {messages.map((message) => (
                     <div key={message.id}>
-                      {message.id === latestCompletedAssistantMessageId ? renderThinkingBlock() : null}
+                      {!isSending && message.id === latestCompletedAssistantMessageId
+                        ? renderThinkingBlock()
+                        : null}
                       <article
                         className={`mx-auto w-full max-w-[760px] text-sm leading-8 text-[#111827] md:text-[15px] ${
                           message.role === "user" ? "flex justify-end" : "block"
@@ -1964,77 +1966,80 @@ function ChatWorkspacePageContent() {
                               </div>
                             ) : (
                               <div
-                                className="w-full rounded-[22px] bg-[#f1f1f1] px-4 py-3 text-[#111827]"
+                                className="flex w-full flex-col items-end"
                                 onMouseEnter={() => setHoveredUserMessageId(message.id)}
                                 onMouseLeave={() =>
                                   setHoveredUserMessageId((current) => (current === message.id ? null : current))
                                 }
                               >
-                                <p>{message.content}</p>
+                                <div className="w-full rounded-[22px] bg-[#f1f1f1] px-4 py-3 text-[#111827]">
+                                  <p>{message.content}</p>
+                                </div>
+                                <div
+                                  className={`mt-0.5 flex h-8 items-center justify-end gap-1.5 pr-1 transition-opacity ${
+                                    hoveredUserMessageId === message.id ? "opacity-100" : "opacity-0"
+                                  }`}
+                                >
+                                  <button
+                                    aria-label="Copy message"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
+                                    onClick={() => handleCopyUserMessage(message.id, message.content)}
+                                    type="button"
+                                  >
+                                    {copiedMessageId === message.id ? (
+                                      <svg aria-hidden="true" className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24">
+                                        <path
+                                          d="M6 12.5 10 16l8-9"
+                                          stroke="currentColor"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth="1.9"
+                                        />
+                                      </svg>
+                                    ) : (
+                                      <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
+                                        <rect
+                                          height="11"
+                                          rx="2.5"
+                                          stroke="currentColor"
+                                          strokeWidth="1.7"
+                                          width="11"
+                                          x="9"
+                                          y="9"
+                                        />
+                                        <path
+                                          d="M15 7.5V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15h1"
+                                          stroke="currentColor"
+                                          strokeLinecap="round"
+                                          strokeWidth="1.7"
+                                        />
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <button
+                                    aria-label="Edit message"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
+                                    onClick={() => handleStartEditMessage(message.id, message.content)}
+                                    type="button"
+                                  >
+                                    <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
+                                      <path
+                                        d="m14.5 5.5 4 4"
+                                        stroke="currentColor"
+                                        strokeLinecap="round"
+                                        strokeWidth="1.7"
+                                      />
+                                      <path
+                                        d="M6 18.5 9.5 18l8.2-8.2a1.8 1.8 0 0 0 0-2.6l-1-1a1.8 1.8 0 0 0-2.6 0L6 14.5l-.5 4Z"
+                                        stroke="currentColor"
+                                        strokeLinejoin="round"
+                                        strokeWidth="1.7"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
                               </div>
                             )}
-
-                            {hoveredUserMessageId === message.id && editingMessageId !== message.id ? (
-                              <div className="mt-0.5 flex items-center justify-end gap-1.5 pr-1">
-                                <button
-                                  aria-label="Copy message"
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
-                                  onClick={() => handleCopyUserMessage(message.id, message.content)}
-                                  type="button"
-                                >
-                                  {copiedMessageId === message.id ? (
-                                    <svg aria-hidden="true" className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24">
-                                      <path
-                                        d="M6 12.5 10 16l8-9"
-                                        stroke="currentColor"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth="1.9"
-                                      />
-                                    </svg>
-                                  ) : (
-                                    <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
-                                      <rect
-                                        height="11"
-                                        rx="2.5"
-                                        stroke="currentColor"
-                                        strokeWidth="1.7"
-                                        width="11"
-                                        x="9"
-                                        y="9"
-                                      />
-                                      <path
-                                        d="M15 7.5V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15h1"
-                                        stroke="currentColor"
-                                        strokeLinecap="round"
-                                        strokeWidth="1.7"
-                                      />
-                                    </svg>
-                                  )}
-                                </button>
-                                <button
-                                  aria-label="Edit message"
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#98a2b3] transition hover:bg-[#f4f6f8] hover:text-[#344054]"
-                                  onClick={() => handleStartEditMessage(message.id, message.content)}
-                                  type="button"
-                                >
-                                  <svg aria-hidden="true" className="h-[17px] w-[17px]" fill="none" viewBox="0 0 24 24">
-                                    <path
-                                      d="m14.5 5.5 4 4"
-                                      stroke="currentColor"
-                                      strokeLinecap="round"
-                                      strokeWidth="1.7"
-                                    />
-                                    <path
-                                      d="M6 18.5 9.5 18l8.2-8.2a1.8 1.8 0 0 0 0-2.6l-1-1a1.8 1.8 0 0 0-2.6 0L6 14.5l-.5 4Z"
-                                      stroke="currentColor"
-                                      strokeLinejoin="round"
-                                      strokeWidth="1.7"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            ) : null}
                           </div>
                         ) : (
                           <div className="max-w-none text-[#1f2937]">

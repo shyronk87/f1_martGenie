@@ -264,6 +264,7 @@ export default function WorkspaceShell({
       });
       setProjects((current) => [nextProject, ...current]);
       saveSelectedProjectId(nextProject.id);
+      onNewConversation?.();
       setProjectModalOpen(false);
       setNewProjectTitle("");
       setNewProjectSummary("");

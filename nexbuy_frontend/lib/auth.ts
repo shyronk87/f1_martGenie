@@ -75,7 +75,7 @@ export function getBackendOrigin() {
     throw configError;
   }
 
-  return configuredOrigin.replace(/\/+$/, "");
+  return (configuredOrigin as string).replace(/\/+$/, "");
 }
 
 export function saveAccessToken(token: string) {

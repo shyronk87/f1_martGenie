@@ -1484,108 +1484,120 @@ function ChatWorkspacePageContent() {
                     </div>
                   </div>
 
-                  {isExpanded ? (
-                    <div className="border-t border-[#dce8f5] px-4 py-5">
+                  <div
+                    className={`grid overflow-hidden transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                      isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                    }`}
+                  >
+                    <div className="min-h-0">
                       <div
-                        className="grid justify-center gap-4"
-                        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 280px))" }}
+                        className={`border-t border-[#dce8f5] px-4 py-5 transition-all duration-300 ${
+                          isExpanded
+                            ? "translate-y-0 opacity-100"
+                            : "pointer-events-none -translate-y-2 opacity-0"
+                        }`}
                       >
-                        {plan.items.map((item) => (
-                          (() => {
-                            const itemSavingsMeta = buildSavingsMeta(deriveListPrice(item), item.price);
-                            return (
-                          <article
-                            className="group relative z-0 flex flex-1 flex-col overflow-hidden rounded-[24px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.12)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.14)]"
-                            key={`${plan.id}-${item.sku}`}
-                          >
-                            <div className="flex items-center justify-between gap-3 px-5 pt-4">
-                              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b97a8]">
-                                Click card for details
-                              </span>
-                              <div className="flex items-center gap-2">
-                              <button
-                                aria-label="Share by email"
-                                className="inline-flex h-8 w-8 items-center justify-center text-[24px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
-                                onClick={() => handleOpenProductShare(item)}
-                                type="button"
-                              >
-                                ✉
-                              </button>
-                              <button
-                                aria-label={favoriteSkuSet.has(item.sku) ? "Remove from likes" : "Add to likes"}
-                                className={`inline-flex h-8 w-8 items-center justify-center text-[26px] leading-none transition hover:-translate-y-0.5 ${
-                                  favoriteSkuSet.has(item.sku) ? "text-[#dc2626]" : "text-[#111827] hover:text-[#111827]"
-                                }`}
-                                disabled={isUpdatingFavoriteSku === item.sku}
-                                onClick={() => void handleToggleFavoriteProduct(item)}
-                                type="button"
-                              >
-                                <span aria-hidden="true">{favoriteSkuSet.has(item.sku) ? "♥" : "♡"}</span>
-                              </button>
-                              </div>
-                            </div>
-                            <Link className="block" href={`/product/${encodeURIComponent(item.sku)}?from=chat`}>
-                              <div className="relative h-44 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
-                                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
-                                {item.imageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    alt={item.title}
-                                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
-                                    src={item.imageUrl}
-                                  />
-                                ) : (
-                                  <div className="h-full w-full bg-[linear-gradient(135deg,#dbeafe,#f8fafc)]" />
-                                )}
-                              </div>
-                              <div className="flex flex-1 flex-col p-5">
-                                <h5 className="line-clamp-2 min-h-[3.5rem] text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">
-                                  {item.title}
-                                </h5>
-                                <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
-                                  {item.reason}
-                                </p>
-                                <div className="mt-auto flex items-center justify-between gap-3 pt-5">
-                                  <div>
-                                    <p className="text-sm font-medium text-[#98a2b3] line-through">
-                                      ${itemSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                    </p>
-                                    <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#123b5f]">
-                                      ${itemSavingsMeta.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                    </p>
-                                    {itemSavingsMeta.savedAmount > 0 ? (
-                                      <p className="mt-1 text-xs font-semibold text-[#2563eb]">
-                                        Save ${itemSavingsMeta.savedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                      </p>
-                                    ) : null}
-                                  </div>
+                        <div
+                          className="grid justify-center gap-4"
+                          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 280px))" }}
+                        >
+                          {plan.items.map((item) => (
+                            (() => {
+                              const itemSavingsMeta = buildSavingsMeta(deriveListPrice(item), item.price);
+                              return (
+                            <article
+                              className="group relative z-0 flex flex-1 flex-col overflow-hidden rounded-[24px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.12)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.14)]"
+                              key={`${plan.id}-${item.sku}`}
+                            >
+                              <div className="flex items-center justify-between gap-3 px-5 pt-4">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8b97a8]">
+                                  Click card for details
+                                </span>
+                                <div className="flex items-center gap-2">
+                                <button
+                                  aria-label="Share by email"
+                                  className="inline-flex h-8 w-8 items-center justify-center text-[24px] leading-none text-[#344054] transition hover:-translate-y-0.5 hover:text-[#101828]"
+                                  onClick={() => handleOpenProductShare(item)}
+                                  type="button"
+                                >
+                                  ✉
+                                </button>
+                                <button
+                                  aria-label={favoriteSkuSet.has(item.sku) ? "Remove from likes" : "Add to likes"}
+                                  className={`inline-flex h-8 w-8 items-center justify-center text-[26px] leading-none transition hover:-translate-y-0.5 ${
+                                    favoriteSkuSet.has(item.sku) ? "text-[#dc2626]" : "text-[#111827] hover:text-[#111827]"
+                                  }`}
+                                  disabled={isUpdatingFavoriteSku === item.sku}
+                                  onClick={() => void handleToggleFavoriteProduct(item)}
+                                  type="button"
+                                >
+                                  <span aria-hidden="true">{favoriteSkuSet.has(item.sku) ? "♥" : "♡"}</span>
+                                </button>
                                 </div>
                               </div>
-                            </Link>
-                          </article>
-                            );
-                          })()
-                        ))}
-                      </div>
+                              <Link className="block" href={`/product/${encodeURIComponent(item.sku)}?from=chat`}>
+                                <div className="relative h-44 overflow-hidden bg-[linear-gradient(180deg,#edf3f9_0%,#e2e8f0_100%)]">
+                                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(191,219,254,0.45),transparent_40%),linear-gradient(180deg,transparent_35%,rgba(15,23,42,0.03)_100%)]" />
+                                  {item.imageUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      alt={item.title}
+                                      className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                                      src={item.imageUrl}
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full bg-[linear-gradient(135deg,#dbeafe,#f8fafc)]" />
+                                  )}
+                                </div>
+                                <div className="flex flex-1 flex-col p-5">
+                                  <h5 className="line-clamp-2 min-h-[3.5rem] text-[17px] font-black leading-7 tracking-[-0.03em] text-[#0f172a]">
+                                    {item.title}
+                                  </h5>
+                                  <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
+                                    {item.reason}
+                                  </p>
+                                  <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+                                    <div>
+                                      <p className="text-sm font-medium text-[#98a2b3] line-through">
+                                        ${itemSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                      </p>
+                                      <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#123b5f]">
+                                        ${itemSavingsMeta.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                      </p>
+                                      {itemSavingsMeta.savedAmount > 0 ? (
+                                        <p className="mt-1 text-xs font-semibold text-[#2563eb]">
+                                          Save ${itemSavingsMeta.savedAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              </Link>
+                            </article>
+                              );
+                            })()
+                          ))}
+                        </div>
 
-                      <div className="mt-5 flex justify-end gap-3 border-t border-[#e8edf3] pt-4">
-                        <button
-                          className="inline-flex h-11 items-center justify-center rounded-[16px] border border-[#d6e0eb] bg-white px-5 text-sm font-semibold text-[#123b5f] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
-                          onClick={() => handleOpenMockNegotiation(plan)}
-                          type="button"
-                        >
-                          View negotiate
-                        </button>
-                        <button
-                          className="inline-flex h-11 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
-                          onClick={() => handleEmbeddedOrder(plan)}
-                          type="button"
-                        >
-                          Place order
-                        </button>
+                        <div className="mt-5 flex justify-end gap-3 border-t border-[#e8edf3] pt-4">
+                          <button
+                            className="inline-flex h-11 items-center justify-center rounded-[16px] border border-[#d6e0eb] bg-white px-5 text-sm font-semibold text-[#123b5f] transition hover:border-[#bfd4ec] hover:bg-[#f8fbff]"
+                            onClick={() => handleOpenMockNegotiation(plan)}
+                            type="button"
+                          >
+                            View negotiate
+                          </button>
+                          <button
+                            className="inline-flex h-11 items-center justify-center rounded-[16px] bg-[linear-gradient(180deg,#111827_0%,#1f2937_100%)] px-5 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.14)] transition hover:brightness-105"
+                            onClick={() => handleEmbeddedOrder(plan)}
+                            type="button"
+                          >
+                            Place order
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  ) : null}
+                  </div>
                 </div>
               );
             })}

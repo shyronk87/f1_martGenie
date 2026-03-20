@@ -8,11 +8,12 @@ class ModelSettings(BaseSettings):
     glm_embedding_dim: int = 2048
     glm_api_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
     llm_analysis_provider: str = "openrouter"
-    llm_analysis_model: str = "qwen/qwen3-30b-a3b"
+    llm_analysis_model: str = "x-ai/grok-4.1-fast"
     llm_analysis_timeout_seconds: int = 90
     llm_bundle_provider: str = "openrouter"
-    llm_bundle_model: str = "minimax/minimax-m2.5"
+    llm_bundle_model: str = "x-ai/grok-4.1-fast"
     llm_bundle_timeout_seconds: int = 30
+    llm_bundle_reasoning_timeout_seconds: int = 12
     llm_buyer_decision_provider: str = "openrouter"
     llm_buyer_decision_model: str = "minimax/minimax-m2.5"
     llm_buyer_decision_timeout_seconds: int = 30
@@ -28,6 +29,7 @@ class ModelSettings(BaseSettings):
     llm_embedding_provider: str = "glm"
     llm_embedding_model: str = "embedding-3"
     llm_embedding_timeout_seconds: int = 15
+    query_use_embedding: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

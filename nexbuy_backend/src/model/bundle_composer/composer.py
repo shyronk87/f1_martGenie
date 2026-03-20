@@ -9,14 +9,11 @@ from src.model.config import model_settings
 from src.model.query_data.schema import ProductRow
 from src.model.user_content_analysis.schema import UserContentAnalysisResult
 
-from .prompt import SYSTEM_PROMPT, build_retry_prompt, build_user_prompt
 from .schema import BundleComposeResult, BundleOption, BundleSelection
 
 
 MAX_CANDIDATES_FOR_COMPOSE = 16
 MAX_OPTIONS = 3
-ATTEMPT1_TIMEOUT_SECONDS = 45
-ATTEMPT2_TIMEOUT_SECONDS = 35
 COMPOSE_CACHE_TTL_SECONDS = 600
 COMPOSE_CACHE_MAX_ITEMS = 256
 _PACKAGE_RE = re.compile(
@@ -37,6 +34,29 @@ _ROOM_FAMILY_KEYWORDS: dict[str, list[str]] = {
     "outdoor": ["outdoor", "patio", "garden"],
     "bath": ["bath", "bathroom", "vanity"],
 }
+REASONING_SYSTEM_PROMPT = """
+You write concise user-facing bundle rationale for furniture recommendations.
+Return ONLY valid JSON with this schema:
+{
+  "options": [
+    {
+      "title": "string",
+      "summary": "string",
+      "explanation": "string",
+      "selection_reasons": ["string"]
+    }
+  ]
+}
+
+Rules:
+1) Keep the same number of options and same item order as the input.
+2) Do not mention SKU, SPU, IDs, raw codes, or internal numbers.
+3) title should be short and clear.
+4) summary should be one short sentence.
+5) explanation should be 2 to 3 short sentences and explain fit, budget, and tradeoffs.
+6) selection_reasons length must match the number of items in that option.
+7) selection_reasons should be short plain-language reasons for each item.
+""".strip()
 
 
 def _extract_json(raw_text: str) -> dict[str, Any]:
@@ -103,6 +123,112 @@ def _fallback(
             )
         )
     return BundleComposeResult(options=options[:MAX_OPTIONS])
+
+
+def _pick_distinct_products(
+    products: list[ProductRow],
+    *,
+    limit: int,
+    prefer_low_price: bool = False,
+    prefer_high_price: bool = False,
+) -> list[ProductRow]:
+    ranked = list(products[:])
+    if prefer_low_price:
+        ranked = sorted(ranked, key=lambda item: float(item.sale_price or 0))
+    elif prefer_high_price:
+        ranked = sorted(ranked, key=lambda item: float(item.sale_price or 0), reverse=True)
+
+    chosen: list[ProductRow] = []
+    seen_family: set[str] = set()
+    seen_sku: set[str] = set()
+    for product in ranked:
+        sku = _normalize_sku(str(product.sku_id_default or ""))
+        if not sku or sku in seen_sku:
+            continue
+        family = _infer_family_key(product)
+        if family in seen_family:
+            continue
+        chosen.append(product)
+        seen_sku.add(sku)
+        seen_family.add(family)
+        if len(chosen) >= limit:
+            break
+    return chosen
+
+
+def _build_heuristic_bundles(
+    candidates: list[ProductRow],
+    analysis: UserContentAnalysisResult,
+) -> BundleComposeResult:
+    if not candidates:
+        return BundleComposeResult(options=[])
+
+    strategies = [
+        (
+            "Best overall fit",
+            "Balances coverage, style fit, and availability.",
+            "This set stays closest to the main request while keeping the mix practical and easy to order.",
+            {},
+        ),
+        (
+            "Best value",
+            "Keeps the overall spend tighter.",
+            "This set leans toward stronger price efficiency while still covering the main product needs.",
+            {"prefer_low_price": True},
+        ),
+        (
+            "Higher-spec pick",
+            "Pushes quality and visual impact a bit more.",
+            "This set uses some stronger premium picks for a more polished result, with a slightly less price-sensitive mix.",
+            {"prefer_high_price": True},
+        ),
+    ]
+
+    allowed_skus = {_normalize_sku(p.sku_id_default) for p in candidates if p.sku_id_default}
+    sku_to_product = {
+        _normalize_sku(p.sku_id_default): p
+        for p in candidates
+        if p.sku_id_default
+    }
+    options: list[BundleOption] = []
+    seen_signatures: set[tuple[str, ...]] = set()
+
+    for title, summary, explanation, picker_kwargs in strategies:
+        picks = _pick_distinct_products(candidates[:10], limit=3, **picker_kwargs)
+        raw_selections = [
+            BundleSelection(sku=product.sku_id_default, reason="Selected for strong fit in this bundle.")
+            for product in picks
+            if product.sku_id_default
+        ]
+        draft = BundleOption(
+            title=title,
+            summary=summary,
+            explanation=explanation,
+            selections=raw_selections,
+        )
+        valid, _ = _filter_valid_selections(
+            draft,
+            allowed_skus,
+            sku_to_product,
+            analysis,
+        )
+        if not valid:
+            continue
+        option = BundleOption(
+            title=title,
+            summary=summary,
+            explanation=explanation,
+            selections=valid[:8],
+        )
+        signature = _selection_signature(option)
+        if not signature or signature in seen_signatures:
+            continue
+        seen_signatures.add(signature)
+        options.append(option)
+
+    if not options:
+        return _fallback(candidates, analysis=analysis)
+    return _ensure_three_options(BundleComposeResult(options=options[:MAX_OPTIONS]), candidates, analysis)
 
 
 def _selection_signature(option: BundleOption) -> tuple[str, ...]:
@@ -373,6 +499,76 @@ def _cache_set(key: str, value: BundleComposeResult) -> None:
     _COMPOSE_CACHE.pop(oldest_key, None)
 
 
+def _build_reasoning_payload(
+    analysis: UserContentAnalysisResult,
+    bundles: BundleComposeResult,
+    sku_to_product: dict[str, ProductRow],
+) -> dict[str, Any]:
+    return {
+        "user_requirements": {
+            "budget": analysis.total_budget,
+            "style_preference": analysis.style_preference,
+            "room_type": analysis.room_type,
+            "hard_constraints": analysis.hard_constraints,
+            "target_items": [item.model_dump() for item in analysis.target_items],
+        },
+        "options": [
+            {
+                "title": option.title,
+                "items": [
+                    {
+                        "title": sku_to_product.get(_normalize_sku(selection.sku)).title,
+                        "category_name_2": sku_to_product.get(_normalize_sku(selection.sku)).category_name_2,
+                        "category_name_3": sku_to_product.get(_normalize_sku(selection.sku)).category_name_3,
+                        "sale_price": sku_to_product.get(_normalize_sku(selection.sku)).sale_price,
+                    }
+                    for selection in option.selections
+                    if sku_to_product.get(_normalize_sku(selection.sku)) is not None
+                ],
+            }
+            for option in bundles.options
+        ],
+    }
+
+
+def _merge_reasoning_response(
+    draft: BundleComposeResult,
+    raw: dict[str, Any],
+) -> BundleComposeResult:
+    options_raw = raw.get("options")
+    if not isinstance(options_raw, list):
+        return draft
+
+    merged_options: list[BundleOption] = []
+    for index, draft_option in enumerate(draft.options):
+        option_raw = options_raw[index] if index < len(options_raw) and isinstance(options_raw[index], dict) else {}
+        title = _sanitize_user_facing_text(str(option_raw.get("title") or draft_option.title)) or draft_option.title
+        summary = _sanitize_user_facing_text(str(option_raw.get("summary") or draft_option.summary)) or draft_option.summary
+        explanation = _sanitize_user_facing_text(
+            str(option_raw.get("explanation") or draft_option.explanation)
+        ) or draft_option.explanation
+
+        reasons_raw = option_raw.get("selection_reasons")
+        merged_selections: list[BundleSelection] = []
+        for selection_index, selection in enumerate(draft_option.selections):
+            reason = selection.reason
+            if isinstance(reasons_raw, list) and selection_index < len(reasons_raw):
+                parsed_reason = _sanitize_user_facing_text(str(reasons_raw[selection_index] or ""))
+                if parsed_reason:
+                    reason = parsed_reason
+            merged_selections.append(BundleSelection(sku=selection.sku, reason=reason))
+
+        merged_options.append(
+            BundleOption(
+                title=title,
+                summary=summary,
+                explanation=explanation,
+                selections=merged_selections,
+            )
+        )
+    return BundleComposeResult(options=merged_options)
+
+
 async def compose_bundle_with_ai(
     analysis: UserContentAnalysisResult,
     candidates: list[ProductRow],
@@ -381,8 +577,9 @@ async def compose_bundle_with_ai(
 ) -> tuple[BundleComposeResult, list[str]]:
     logs: list[str] = []
     if not candidates:
-        return BundleComposeResult(summary="No candidates to compose."), ["[bundle_composer] no candidates"]
+        return BundleComposeResult(options=[]), ["[bundle_composer] no candidates"]
 
+    t0 = time.perf_counter()
     ranked_candidates = _prepare_candidates(candidates)
     cache_key = _cache_key(analysis, ranked_candidates, long_term_memory)
     cached = _cache_get(cache_key)
@@ -390,104 +587,70 @@ async def compose_bundle_with_ai(
         logs.append("[bundle_composer] cache hit")
         return cached, logs
 
-    payload = _build_payload(analysis, ranked_candidates)
-    if long_term_memory:
-        payload["long_term_memory"] = long_term_memory
-        payload["priority_rule"] = "current_user_request_overrides_long_term_memory"
-    llm = get_llm_client(
-        model_settings.llm_bundle_provider,
-        model=model_settings.llm_bundle_model,
-    )
     logs.append(
         f"[bundle_composer] input candidates={len(candidates)}, used for compose={len(ranked_candidates)}"
-    )
-    logs.append(
-        f"[bundle_composer] llm provider={model_settings.llm_bundle_provider}, "
-        f"model={model_settings.llm_bundle_model}"
     )
     if long_term_memory:
         used_keys = [k for k, v in long_term_memory.items() if v not in (None, "", [], {})]
         logs.append(f"[bundle_composer] long memory loaded: {used_keys}")
 
-    allowed_skus = {_normalize_sku(c.sku_id_default) for c in ranked_candidates if c.sku_id_default}
     sku_to_product = {
         _normalize_sku(c.sku_id_default): c
         for c in ranked_candidates
         if c.sku_id_default
     }
+    heuristic = _build_heuristic_bundles(ranked_candidates, analysis)
+    logs.append(
+        f"[bundle_composer] heuristic bundles ready in {(time.perf_counter() - t0):.2f}s, "
+        f"options={len(heuristic.options)}"
+    )
 
-    async def _attempt(
-        user_prompt: str,
-        timeout_seconds: int,
-        tag: str,
-    ) -> tuple[BundleComposeResult | None, str | None]:
+    async def _generate_reasons() -> BundleComposeResult | None:
         try:
+            llm = get_llm_client(
+                model_settings.llm_bundle_provider,
+                model=model_settings.llm_bundle_model,
+            )
+            logs.append(
+                f"[bundle_composer] reasoning llm provider={model_settings.llm_bundle_provider}, "
+                f"model={model_settings.llm_bundle_model}"
+            )
+            payload = _build_reasoning_payload(analysis, heuristic, sku_to_product)
+            t_reason = time.perf_counter()
             result = await asyncio.wait_for(
                 llm.chat(
                     messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_prompt},
+                        {"role": "system", "content": REASONING_SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": (
+                                "Refine the bundle titles and reasons for the preselected options below.\n"
+                                "Return JSON only.\n"
+                                f"{json.dumps(payload, ensure_ascii=False)}"
+                            ),
+                        },
                     ],
-                    temperature=0.0,
-                    timeout_seconds=model_settings.llm_bundle_timeout_seconds,
+                    temperature=0.2,
+                    timeout_seconds=model_settings.llm_bundle_reasoning_timeout_seconds,
                 ),
-                timeout=timeout_seconds,
+                timeout=model_settings.llm_bundle_reasoning_timeout_seconds,
             )
-            raw = _extract_json(result.content)
-            composed = _sanitize_compose_result(_normalize_compose_result(raw))
-            valid_options: list[BundleOption] = []
-            total_guard_drops = 0
-            for opt in composed.options[:MAX_OPTIONS]:
-                valid, dropped = _filter_valid_selections(
-                    opt,
-                    allowed_skus,
-                    sku_to_product,
-                    analysis,
-                )
-                total_guard_drops += dropped
-                if not valid:
-                    continue
-                opt.selections = valid[:8]
-                valid_options.append(opt)
-            if not valid_options:
-                return None, f"[bundle_composer] {tag} got no valid sku"
-            if total_guard_drops > 0:
-                logs.append(f"[bundle_composer] {tag} guard dropped {total_guard_drops} conflicting set selections")
-            return _ensure_three_options(
-                BundleComposeResult(options=valid_options),
-                ranked_candidates,
-                analysis,
-            ), None
+            logs.append(
+                f"[bundle_composer] reasoning generated in {(time.perf_counter() - t_reason):.2f}s"
+            )
+            return _merge_reasoning_response(heuristic, _extract_json(result.content))
         except asyncio.TimeoutError:
-            return None, f"[bundle_composer] {tag} timeout after {timeout_seconds}s"
+            logs.append("[bundle_composer] reasoning timeout, using heuristic copy")
+            return None
         except Exception as exc:
-            return None, f"[bundle_composer] {tag} failed: {exc}"
+            logs.append(f"[bundle_composer] reasoning failed, using heuristic copy: {exc}")
+            return None
 
-    first_prompt = build_user_prompt(json.dumps(payload, ensure_ascii=False))
-    draft, err = await _attempt(first_prompt, ATTEMPT1_TIMEOUT_SECONDS, "attempt#1")
-    if draft is not None:
-        logs.append("[bundle_composer] attempt#1 success")
-        logs.append(
-            f"[bundle_composer] valid options={len(draft.options)}, "
-            f"total selections={sum(len(o.selections) for o in draft.options)}"
-        )
-        _cache_set(cache_key, draft)
-        return draft, logs
-    if err:
-        logs.append(err)
-
-    retry_prompt = build_retry_prompt(json.dumps(payload, ensure_ascii=False))
-    draft_retry, err_retry = await _attempt(retry_prompt, ATTEMPT2_TIMEOUT_SECONDS, "attempt#2")
-    if draft_retry is not None:
-        logs.append("[bundle_composer] attempt#2 success")
-        logs.append(
-            f"[bundle_composer] valid options={len(draft_retry.options)}, "
-            f"total selections={sum(len(o.selections) for o in draft_retry.options)}"
-        )
-        _cache_set(cache_key, draft_retry)
-        return draft_retry, logs
-    if err_retry:
-        logs.append(err_retry)
-
-    logs.append("[bundle_composer] fallback used after retries")
-    return _fallback(ranked_candidates, analysis=analysis), logs
+    refined = await _generate_reasons()
+    final_result = _sanitize_compose_result(refined or heuristic)
+    logs.append(
+        f"[bundle_composer] done in {(time.perf_counter() - t0):.2f}s, "
+        f"options={len(final_result.options)}, total selections={sum(len(o.selections) for o in final_result.options)}"
+    )
+    _cache_set(cache_key, final_result)
+    return final_result, logs

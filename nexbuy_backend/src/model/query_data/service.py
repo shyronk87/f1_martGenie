@@ -1,6 +1,7 @@
 import time
 from typing import Any
 
+from src.model.config import model_settings
 from src.model.user_content_analysis.schema import UserContentAnalysisResult
 
 from .db import query_products
@@ -48,7 +49,7 @@ async def query_products_from_analysis(
         f"room={len(filters.room_keywords)}, items={len(filters.item_categories)}, "
         f"constraints={len(filters.constraint_keywords)}"
     )
-    if filters.query_text:
+    if filters.query_text and model_settings.query_use_embedding:
         t_embed = time.perf_counter()
         try:
             embedding_client = EmbeddingService()
@@ -60,6 +61,8 @@ async def query_products_from_analysis(
         except Exception as exc:
             filters.query_vector = None
             logs.append(f"[query_data] embedding failed, fallback to keyword-only search: {exc}")
+    elif filters.query_text:
+        logs.append("[query_data] embedding skipped by config, using keyword-only search")
     else:
         logs.append("[query_data] empty query_text, using keyword-only search")
 

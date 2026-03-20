@@ -81,6 +81,13 @@ def _normalize(parsed: dict[str, Any]) -> UserContentAnalysisResult:
         except (TypeError, ValueError):
             total_budget = None
 
+    if total_budget is None and items:
+        item_budgets = [item.item_budget_allocation for item in items if item.item_budget_allocation is not None]
+        if len(items) == 1 and len(item_budgets) == 1:
+            total_budget = float(item_budgets[0])
+        elif len(item_budgets) == len(items):
+            total_budget = float(sum(item_budgets))
+
     style_preference = parsed.get("style_preference")
     style = str(style_preference).strip() if style_preference is not None else None
     if style == "":

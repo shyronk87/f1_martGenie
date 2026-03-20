@@ -15,6 +15,9 @@ Hard rules:
      "item_budget_allocation": number or null,
      "specific_features": ["string", ...]
    }
+   If the user gives a budget for a single requested item (for example "bedside lamp under $180"),
+   also copy that value into total_budget.
+   If the user gives per-item budgets for all requested items, you may set total_budget as their sum.
 5) is_ready rule:
    - total_budget is not null
    - style_preference is not null

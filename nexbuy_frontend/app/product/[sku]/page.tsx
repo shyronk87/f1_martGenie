@@ -28,14 +28,8 @@ function formatMoney(value: number | null | undefined, currencySymbol = "$") {
 }
 
 function getPricePairs(product: ProductDetail) {
-  const currentPrice = product.sale_price ?? product.final_price ?? product.activity_price ?? null;
-  const originalCandidates = [product.original_price, product.compare_price, product.tag_price].filter(
-    (value): value is number => typeof value === "number",
-  );
-  const originalPrice =
-    typeof currentPrice === "number"
-      ? originalCandidates.filter((value) => value > currentPrice).sort((a, b) => b - a)[0] ?? currentPrice
-      : originalCandidates.sort((a, b) => b - a)[0] ?? null;
+  const currentPrice = typeof product.sale_price === "number" ? product.sale_price : null;
+  const originalPrice = typeof product.original_price === "number" ? product.original_price : null;
   return { currentPrice, originalPrice };
 }
 
@@ -482,7 +476,7 @@ function ProductDetailPageContent() {
                       {typeof product.rating_value === "number" ? (
                         <span className="inline-flex items-center gap-2">
                           <span className="text-[#f59e0b]">{buildStarRating(product.rating_value)}</span>
-                          <span>{product.rating_value.toFixed(1)} rating</span>
+                          <span>{product.rating_value.toFixed(1)}</span>
                         </span>
                       ) : null}
                       {product.stock_status_text ? <span>{product.stock_status_text}</span> : null}

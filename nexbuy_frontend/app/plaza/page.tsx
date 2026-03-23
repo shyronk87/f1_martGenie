@@ -291,6 +291,11 @@ export default function PlazaPage() {
   }
 
   function renderRecommendationCard(product: PlazaRecommendationProduct) {
+    const currentPrice = product.sale_price ?? 0;
+    const originalPrice =
+      typeof product.original_price === "number" ? product.original_price : currentPrice;
+    const savedAmount = Math.max(0, originalPrice - currentPrice);
+
     return (
       <div className="flex h-full flex-col gap-3" key={product.sku_id_default}>
         <article className="group relative z-0 flex flex-1 flex-col overflow-visible rounded-[28px] border border-[#dbe5f0] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,252,0.96)_100%)] shadow-[0_18px_45px_rgba(148,163,184,0.14)] transition duration-300 hover:-translate-y-1 hover:border-[#bfd3ea] hover:shadow-[0_24px_55px_rgba(96,165,250,0.16)]">
@@ -337,9 +342,21 @@ export default function PlazaPage() {
               <p className="mt-3 line-clamp-3 min-h-[5.25rem] text-sm leading-7 text-[#475467]">
                 {product.recommendation_reason}
               </p>
-              <p className="mt-auto pt-5 text-xl font-black tracking-[-0.03em] text-[#0f172a]">
-                {formatMoney(product.sale_price ?? 0)}
-              </p>
+              <div className="mt-auto pt-5">
+                {savedAmount > 0 ? (
+                  <p className="text-sm font-medium text-[#98a2b3] line-through">
+                    {formatMoney(originalPrice)}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#123b5f]">
+                  {formatMoney(currentPrice)}
+                </p>
+                {savedAmount > 0 ? (
+                  <p className="mt-1 text-xs font-semibold text-[#2563eb]">
+                    Save {formatMoney(savedAmount)}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </Link>
         </article>

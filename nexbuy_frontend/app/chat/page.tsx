@@ -290,20 +290,18 @@ function notifyHistoryRefresh() {
 }
 
 function deriveListPrice(item: PlanOption["items"][number]) {
-  if (typeof item.originalPrice === "number" && item.originalPrice > item.price) {
+  if (typeof item.originalPrice === "number") {
     return item.originalPrice;
   }
 
-  const stableMarkup = 1.12 + ((item.sku.charCodeAt(item.sku.length - 1) || 0) % 6) * 0.02;
-  return Math.round(item.price * stableMarkup * 100) / 100;
+  return item.price;
 }
 
 function buildSavingsMeta(originalPrice: number, currentPrice: number) {
-  const safeOriginal = Math.max(originalPrice, currentPrice);
-  const savedAmount = Math.max(safeOriginal - currentPrice, 0);
-  const savedPercent = safeOriginal > 0 ? Math.round((savedAmount / safeOriginal) * 100) : 0;
+  const savedAmount = Math.max(originalPrice - currentPrice, 0);
+  const savedPercent = originalPrice > 0 ? Math.round((savedAmount / originalPrice) * 100) : 0;
   return {
-    originalPrice: safeOriginal,
+    originalPrice,
     currentPrice,
     savedAmount: Math.round(savedAmount * 100) / 100,
     savedPercent,
@@ -1469,9 +1467,11 @@ function ChatWorkspacePageContent() {
                         type="button"
                       >
                         <div className="flex flex-col items-end">
-                          <p className="text-xs font-medium text-[#98a2b3] line-through">
-                            ${totalSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                          </p>
+                          {totalSavingsMeta.savedAmount > 0 ? (
+                            <p className="text-xs font-medium text-[#98a2b3] line-through">
+                              ${totalSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                            </p>
+                          ) : null}
                           <div className="mt-1 rounded-full bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] px-3.5 py-1.5 text-base font-black text-[#123b5f] shadow-[0_8px_20px_rgba(59,130,246,0.12)]">
                             ${totalSavingsMeta.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                           </div>
@@ -1572,9 +1572,11 @@ function ChatWorkspacePageContent() {
                                   </p>
                                   <div className="mt-auto flex items-center justify-between gap-3 pt-5">
                                     <div>
-                                      <p className="text-sm font-medium text-[#98a2b3] line-through">
-                                        ${itemSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                      </p>
+                                      {itemSavingsMeta.savedAmount > 0 ? (
+                                        <p className="text-sm font-medium text-[#98a2b3] line-through">
+                                          ${itemSavingsMeta.originalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                        </p>
+                                      ) : null}
                                       <p className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#123b5f]">
                                         ${itemSavingsMeta.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                       </p>

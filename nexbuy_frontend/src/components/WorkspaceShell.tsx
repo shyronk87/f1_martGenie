@@ -65,6 +65,7 @@ export default function WorkspaceShell({
   children,
 }: WorkspaceShellProps) {
   const router = useRouter();
+  const [hasMounted, setHasMounted] = useState(false);
   const [selectedHistoryId, setSelectedHistoryId] = useState("current");
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -93,7 +94,7 @@ export default function WorkspaceShell({
     readSelectedProjectId,
     readSelectedProjectServerSnapshot,
   );
-  const effectiveAuthenticated = isAuthenticated || Boolean(authToken);
+  const effectiveAuthenticated = isAuthenticated || (hasMounted && Boolean(authToken));
 
   const historyItems = useMemo<HistoryItem[]>(
     () => (effectiveAuthenticated ? remoteHistoryItems : []),
@@ -104,6 +105,10 @@ export default function WorkspaceShell({
     [effectiveAuthenticated, projects],
   );
   const displayEmail = effectiveAuthenticated ? authUserEmail || "Signed in" : "";
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!effectiveAuthenticated) {

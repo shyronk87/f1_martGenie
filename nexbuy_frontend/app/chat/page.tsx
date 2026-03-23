@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   clearAccessToken,
   fetchCurrentUser,
@@ -874,6 +874,20 @@ function ChatWorkspacePageContent() {
     await submitPrompt(content);
   }
 
+  function handlePromptKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    const content = prompt.trim();
+    if (!content || isSending) {
+      return;
+    }
+
+    void submitPrompt(content);
+  }
+
   function handleCancel() {
     unsubscribeRef.current?.();
     unsubscribeRef.current = null;
@@ -1664,6 +1678,7 @@ function ChatWorkspacePageContent() {
             data-variant={which}
             disabled={isSending}
             onChange={(event) => handlePromptChange(event.target.value, textareaRef.current)}
+            onKeyDown={handlePromptKeyDown}
             placeholder={placeholder}
             ref={textareaRef}
             rows={1}

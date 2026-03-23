@@ -40,7 +40,11 @@ class GuestSessionIn(BaseModel):
 def _build_guest_email(guest_device_id: str) -> str:
     guest_slug = "".join(char for char in guest_device_id.lower() if char.isalnum())
     guest_slug = guest_slug[:32] or secrets.token_hex(8)
-    return f"guest+{guest_slug}@guest.martgennie.local"
+    return f"guest+{guest_slug}@martgennie.smartlpmanager.top"
+
+
+def _needs_guest_email_repair(user: User) -> bool:
+    return bool(user.is_guest and user.email.endswith("@guest.martgennie.local"))
 
 
 async def _get_or_create_guest_user(
@@ -51,6 +55,10 @@ async def _get_or_create_guest_user(
     normalized_device_id = guest_device_id.strip()
     existing = await session.scalar(select(User).where(User.guest_device_id == normalized_device_id))
     if existing is not None:
+        if _needs_guest_email_repair(existing):
+            existing.email = _build_guest_email(normalized_device_id)
+            await session.commit()
+            await session.refresh(existing)
         return existing
 
     guest_user = User(

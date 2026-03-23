@@ -1597,8 +1597,14 @@ function ChatWorkspacePageContent() {
   function applyPromptSuggestion(value: string) {
     setPrompt(value);
     window.requestAnimationFrame(() => {
+      const targetTextarea = hasConversation ? composerTextareaRef.current : heroTextareaRef.current;
       resizeComposer(heroTextareaRef.current);
       resizeComposer(composerTextareaRef.current);
+      if (targetTextarea) {
+        targetTextarea.focus();
+        const caretPosition = value.length;
+        targetTextarea.setSelectionRange(caretPosition, caretPosition);
+      }
     });
   }
 

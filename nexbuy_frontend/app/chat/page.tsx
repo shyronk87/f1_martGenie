@@ -1050,28 +1050,6 @@ function ChatWorkspacePageContent() {
     return `${minutes}m ${remainingSeconds}s`;
   }
 
-  function iconForThinkingStep(title: string) {
-    if (title.includes("Understanding") || title.includes("Brief understood")) {
-      return "◔";
-    }
-    if (title.includes("Checking")) {
-      return "◌";
-    }
-    if (title.includes("Searching") || title.includes("Products found")) {
-      return "⌕";
-    }
-    if (title.includes("Building") || title.includes("Packages ready")) {
-      return "◫";
-    }
-    if (title.includes("Done")) {
-      return "✓";
-    }
-    if (title.includes("Something went wrong")) {
-      return "!";
-    }
-    return "·";
-  }
-
   function renderThinkingBlock() {
     if (!isSending && displayedTimeline.length === 0) {
       return null;
@@ -1137,8 +1115,7 @@ function ChatWorkspacePageContent() {
             <div className="pl-10 pr-1 pb-3">
               <div className="mb-2 h-px bg-[linear-gradient(90deg,rgba(217,225,235,0)_0%,rgba(217,225,235,0.95)_12%,rgba(217,225,235,0.95)_88%,rgba(217,225,235,0)_100%)]" />
               <div className="space-y-3">
-              {visibleThinkingSteps.map(({ event, friendly }, index) => {
-                const isLatest = index === 0;
+              {visibleThinkingSteps.map(({ event, friendly }) => {
                 return (
                   <div className="flex items-start gap-3" key={event.id}>
                       <div className="min-w-0 flex-1">

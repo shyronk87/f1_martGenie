@@ -4,6 +4,7 @@ export type AuthUser = {
   is_active?: boolean;
   is_superuser?: boolean;
   is_verified?: boolean;
+  is_guest?: boolean;
 };
 
 type JwtLoginResponse = {
@@ -33,6 +34,7 @@ export class AuthRequestError extends Error {
 const ACCESS_TOKEN_KEY = "nexbuy.access_token";
 const USER_EMAIL_KEY = "nexbuy.auth.user_email";
 const USER_ID_KEY = "nexbuy.auth.user_id";
+const GUEST_DEVICE_ID_KEY = "nexbuy.auth.guest_device_id";
 const OAUTH_RETURN_TO_KEY = "nexbuy.auth.return_to";
 const DEFAULT_API_BASE_URL = "/api";
 export const AUTH_STATE_CHANGE_EVENT = "nexbuy.auth.changed";
@@ -138,6 +140,21 @@ export function clearAccessToken() {
   window.localStorage.removeItem(USER_EMAIL_KEY);
   window.localStorage.removeItem(USER_ID_KEY);
   window.dispatchEvent(new Event(AUTH_STATE_CHANGE_EVENT));
+}
+
+export function getOrCreateGuestDeviceId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const existing = window.localStorage.getItem(GUEST_DEVICE_ID_KEY);
+  if (existing) {
+    return existing;
+  }
+
+  const next = crypto.randomUUID();
+  window.localStorage.setItem(GUEST_DEVICE_ID_KEY, next);
+  return next;
 }
 
 let refreshPromise: Promise<string> | null = null;
@@ -280,6 +297,31 @@ export async function loginWithEmail(email: string, password: string) {
 
   if (!data.access_token) {
     throw new Error("Login succeeded but no access token was returned.");
+  }
+
+  return data.access_token;
+}
+
+export async function loginAsGuest() {
+  const guestDeviceId = getOrCreateGuestDeviceId();
+  const response = await fetch(`${getApiBaseUrl()}/auth/session/guest`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      guest_device_id: guestDeviceId,
+    }),
+  });
+
+  const data = await parseJsonResponse<JwtLoginResponse>(
+    response,
+    "Guest login failed.",
+  );
+
+  if (!data.access_token) {
+    throw new Error("Guest login succeeded but no access token was returned.");
   }
 
   return data.access_token;

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .auth.config import settings
 from .auth.db import engine
-from .auth.models import Base
+from .auth.models import Base, ensure_guest_user_schema
 from .agent_negotiation_router import router as agent_negotiation_router
 from .auth.router import router as auth_router
 from .chat import models as _chat_models  # noqa: F401
@@ -33,6 +33,7 @@ from .share_router import router as share_router
 async def lifespan(_: FastAPI):
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+        await ensure_guest_user_schema(connection)
         await ensure_chat_project_schema(connection)
         await ensure_user_profile_memory_schema(connection)
         await ensure_plaza_feedback_schema(connection)

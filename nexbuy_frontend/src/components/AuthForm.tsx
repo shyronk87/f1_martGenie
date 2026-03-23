@@ -3,9 +3,13 @@
 import { FormEvent, useState } from "react";
 import Image from "next/image";
 import {
+  fetchCurrentUser,
+  loginAsGuest,
   loginWithEmail,
   registerWithEmail,
   requestGoogleAuthorization,
+  saveAuthUserEmail,
+  saveAuthUserId,
   saveOAuthReturnTo,
   saveAccessToken,
 } from "@/lib/auth";
@@ -52,6 +56,11 @@ export default function AuthForm({ onSuccess }: Props) {
 
       const token = await loginWithEmail(email, password);
       saveAccessToken(token);
+      const user = await fetchCurrentUser(token);
+      saveAuthUserEmail(user.email);
+      if (user.id) {
+        saveAuthUserId(user.id);
+      }
       setMessage("Signed in successfully.");
       await onSuccess?.();
     } catch (e) {
@@ -71,6 +80,28 @@ export default function AuthForm({ onSuccess }: Props) {
       window.location.href = authorizationUrl;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to start Google sign-in.");
+      setIsBusy(false);
+    }
+  }
+
+  async function handleGuest() {
+    setIsBusy(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const token = await loginAsGuest();
+      saveAccessToken(token);
+      const user = await fetchCurrentUser(token);
+      saveAuthUserEmail(user.email);
+      if (user.id) {
+        saveAuthUserId(user.id);
+      }
+      setMessage("Guest workspace is ready.");
+      await onSuccess?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to start guest session.");
+    } finally {
       setIsBusy(false);
     }
   }
@@ -147,7 +178,7 @@ export default function AuthForm({ onSuccess }: Props) {
 
       <div className="my-4 flex items-center gap-3">
         <div className="h-px flex-1 bg-[#dbe2eb]" />
-        <span className="text-sm text-[#8b97a8]">Or continue with Google</span>
+        <span className="text-sm text-[#8b97a8]">Or continue another way</span>
         <div className="h-px flex-1 bg-[#dbe2eb]" />
       </div>
 
@@ -159,6 +190,15 @@ export default function AuthForm({ onSuccess }: Props) {
       >
         <Image alt="Google" height={20} src="/google.png" width={20} />
         Continue with Google
+      </button>
+
+      <button
+        className="mt-3 flex h-[52px] w-full items-center justify-center gap-3 rounded-2xl border border-dashed border-[#c9d3df] bg-[#f8fafc] text-lg font-semibold text-[#101828] shadow-[0_10px_24px_rgba(148,163,184,0.08)] transition hover:border-[#b7c4d3] hover:bg-white disabled:opacity-60"
+        disabled={isBusy}
+        onClick={handleGuest}
+        type="button"
+      >
+        Continue as Guest
       </button>
 
       {message ? <p className="mt-4 text-sm text-[#156f52]">{message}</p> : null}
